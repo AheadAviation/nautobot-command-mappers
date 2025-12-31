@@ -1,0 +1,146 @@
+sync_devices:
+  manufacturer:
+    commands:
+      - command: "show sys hardware"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "F5 Networks"  # Static is fine and reliable
+
+  device_type:
+    commands:
+      - command: "show sys hardware"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set type = '' -%}
+          {%- for line in lines -%}
+            {%- if 'Type' in line and ':' in line -%}
+              {{ line.split(':')[1].strip() }}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+  model:
+    commands:
+      - command: "show sys hardware"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set model = '' -%}
+          {%- for line in lines -%}
+            {%- if 'Marketing Name' in line and line.split(':')|length > 1 -%}
+              {%- set model = line.split(':')[1].strip() -%}
+            {%- elif 'Type' in line and line.split(':')|length > 1 and not model -%}
+              {%- set model = line.split(':')[1].strip() -%}
+            {%- elif 'Name BIG-IP' in line and not model -%}
+              {%- set model = 'BIG-IP Virtual Edition' -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ model or 'F5 Unknown Model' }}
+
+  version:
+    commands:
+      - command: "show sys version"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- for line in lines -%}
+            {%- if 'Version' in line and line.split('Version')|length > 1 -%}
+              {{ line.split('Version')[1].strip().split(' ')[0] }}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+  hostname:
+    commands:
+      - command: "list sys global-settings hostname one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- for line in lines -%}
+            {%- if 'hostname' in line.lower() and '{' in line -%}
+              {%- set parts = line.split('hostname') -%}
+              {%- if parts|length > 1 -%}
+                {{ parts[1].strip().strip('}').strip('{').strip() }}
+                {%- break -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+  serial_number:
+    commands:
+      - command: "show sys hardware"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- for line in lines -%}
+            {%- if 'Chassis Serial' in line and ':' in line -%}
+              {{ line.split(':')[1].strip() }}
+              {%- break -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+  mgmt_ip:
+    commands:
+      - command: "list sys management-ip one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- for line in lines -%}
+            {%- if 'sys management-ip' in line -%}
+              {%- set parts = line.split('sys management-ip') -%}
+              {%- if parts|length > 1 -%}
+                {%- set ip_part = parts[1].strip().split('{')[0].strip() -%}
+                {%- if '/' in ip_part -%}
+                  {{ ip_part.split('/')[0].strip() }}
+                {%- else -%}
+                  {{ ip_part }}
+                {%- endif -%}
+                {%- break -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+sync_network_data:
+  interfaces:
+    commands:
+      - command: "list net interface all-properties one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "{{ obj }}"
+  trunks:
+    commands:
+      - command: "list net trunk all-properties one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "{{ obj }}"
+  vlans:
+    commands:
+      - command: "list net vlan all-properties one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "{{ obj }}"
+  self_ips:
+    commands:
+      - command: "list net self all-properties one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "{{ obj }}"
+  route_domains:
+    commands:
+      - command: "list net route-domain one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "{{ obj }}"
+  virtual_interfaces:
+    commands:
+      - command: "list ltm virtual all-properties one-line"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "{{ obj }}"
