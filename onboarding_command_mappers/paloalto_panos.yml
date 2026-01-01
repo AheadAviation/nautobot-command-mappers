@@ -48,9 +48,9 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = 'PA-VM' -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() and result == 'PA-VM' -%}
+            {%- if 'model:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
@@ -69,7 +69,7 @@ sync_devices:
           {%- set manufacturer = 'Palo Alto Networks' -%}
           {%- set model = '' -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() -%}
+            {%- if 'model:' in line.lower() and not model -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set model = parts[1].strip() -%}
@@ -79,7 +79,7 @@ sync_devices:
           {%- if model -%}
             {{ manufacturer }} {{ model }}
           {%- else -%}
-            {{ manufacturer }} PA-VM
+            {{ manufacturer }}
           {%- endif -%}
 
   platform:
@@ -180,19 +180,21 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '24' -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() and result == '24' -%}
+            {%- if 'ip-address:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
                   {%- set result = ip_part.split('/')[1].strip() -%}
+                {%- else -%}
+                  {%- set result = '24' -%}
                 {%- endif -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ result if result else '24' }}
 
 sync_network_data:
   serial:
