@@ -54,10 +54,11 @@ sync_devices:
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
+                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ result if result else 'PA-VM' }}
 
   device_type:
     commands:
@@ -120,10 +121,11 @@ sync_devices:
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
+                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ result if result else '' }}
 
   serial:
     commands:
@@ -138,10 +140,11 @@ sync_devices:
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
+                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ result if result else '' }}
 
   mgmt_ip:
     commands:
@@ -192,6 +195,7 @@ sync_devices:
                 {%- if '/' in ip_part -%}
                   {%- set result = ip_part.split('/')[1].strip() -%}
                 {%- endif -%}
+                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
