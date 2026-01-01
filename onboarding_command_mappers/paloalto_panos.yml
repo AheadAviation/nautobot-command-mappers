@@ -48,17 +48,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set found = false -%}
+          {%- set result = 'PA-VM' -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() and not found -%}
+            {%- if 'model:' in line.lower() and result == 'PA-VM' -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {{ parts[1].strip() }}
-                {%- set found = true -%}
+                {%- set result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not found -%}PA-VM{%- endif -%}
+          {{ result }}
 
   device_type:
     commands:
@@ -115,17 +114,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set found = false -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'hostname:' in line.lower() and not found -%}
+            {%- if 'hostname:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {{ parts[1].strip() }}
-                {%- set found = true -%}
+                {%- set result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not found -%}{{ '' }}{%- endif -%}
+          {{ result }}
 
   serial:
     commands:
@@ -134,17 +132,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set found = false -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'serial:' in line.lower() and not found -%}
+            {%- if 'serial:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {{ parts[1].strip() }}
-                {%- set found = true -%}
+                {%- set result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not found -%}{{ '' }}{%- endif -%}
+          {{ result }}
 
   mgmt_ip:
     commands:
@@ -153,22 +150,21 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set found = false -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() and not found -%}
+            {%- if 'ip-address:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {{ ip_part.split('/')[0].strip() }}
+                  {%- set result = ip_part.split('/')[0].strip() -%}
                 {%- else -%}
-                  {{ ip_part }}
+                  {%- set result = ip_part -%}
                 {%- endif -%}
-                {%- set found = true -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not found -%}{{ '' }}{%- endif -%}
+          {{ result }}
 
   mgmt_interface:
     commands:
@@ -184,22 +180,19 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set found = false -%}
+          {%- set result = '24' -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() and not found -%}
+            {%- if 'ip-address:' in line.lower() and result == '24' -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {{ ip_part.split('/')[1].strip() }}
-                {%- else -%}
-                  24
+                  {%- set result = ip_part.split('/')[1].strip() -%}
                 {%- endif -%}
-                {%- set found = true -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not found -%}24{%- endif -%}
+          {{ result }}
 
 sync_network_data:
   serial:
