@@ -16,22 +16,114 @@ This repository contains YAML override files for the Nautobot Device Onboarding 
 ### Palo Alto PAN-OS (`paloalto_panos.yml`)
 
 **Status:** ✅ Production Ready  
-**Version:** v2.1  
-**Tested:** PAN-OS 10.x
+**Version:** v2.2  
+**Tested:** PAN-OS 8.0+ (tested on PAN-OS 10.x)
 
-**Features:**
-- Device information extraction (manufacturer, model, serial, hostname, version)
-- Interface discovery (physical, subinterfaces, management)
-- IP address extraction with CIDR notation
-- VLAN tag extraction for subinterfaces
-- Virtual Router (VRF) parsing (manual assignment required)
-- Trunk/access mode detection
-- Management interface identification
+#### Requirements
 
-**Known Limitations:**
-- VRF assignments must be done manually in Nautobot after onboarding (plugin limitation)
-- MAC addresses not available from running config
-- Link status defaults to `true` (not available in running config)
+**Nautobot Configuration:**
+
+This override requires specific Nautobot configuration for proper operation. Add the following to your `nautobot_config.py`:
+
+```python
+PLUGINS_CONFIG = {
+    "nautobot_device_onboarding": {
+        "netmiko_optional_args": {
+            "read_timeout": 60,  # Increase from default 20s for slow devices
+            "timeout": 90,
+            "banner_timeout": 60,
+            "global_delay_factor": 3,
+            "fast_cli": False,
+        },
+    },
+    "nautobot_plugin_nornir": {
+        "connection_options": {
+            "netmiko": {
+                "extras": {
+                    "read_timeout": 60,
+                    "read_timeout_override": 60,
+                }
+            }
+        }
+    }
+}
+```
+
+After updating the configuration, restart Nautobot services:
+```bash
+docker-compose restart nautobot celery_worker
+```
+
+**Required Device Access:**
+- SSH access to the Palo Alto device
+- Read access to execute: `show system info`, `show config running`, `show lldp neighbors all`
+- Device must have proper SSH credentials configured in Nautobot Secrets Groups
+
+**Nautobot Jobs:**
+- **Initial Onboarding:** "Sync Devices From Network" job (UUID: `fd72f5d7-622e-4e4b-98e4-b7216b732082`)
+- **Advanced Sync:** "Sync Network Data From Network" job (UUID: `8b7047c3-f311-44e6-8404-54ea5b95d9e9`)
+
+#### Features
+
+**Sync Devices (Initial Onboarding):**
+- ✅ Manufacturer extraction (Palo Alto Networks)
+- ✅ Model extraction from `show system info`
+- ✅ Serial number extraction
+- ✅ Hostname extraction
+- ✅ Software version extraction
+
+**Sync Network Data (Advanced Sync):**
+- ✅ **Interfaces:**
+  - Physical interfaces (ethernet1/1, ethernet1/10, etc.)
+  - Logical/sub-interfaces (ethernet1/12.10, ethernet1/12.11, etc.)
+  - Management interface (`mgmt`)
+  - Loopback and tunnel interfaces
+  - Interface descriptions
+  - IP address extraction with CIDR notation
+  - VLAN tag extraction for sub-interfaces
+  - 802.1Q mode detection (access/tagged)
+  - Tagged VLAN assignments for trunk interfaces
+  - Untagged VLAN assignments for access interfaces
+  
+- ✅ **Virtual Routers (VRFs):**
+  - Extraction of all virtual routers from running config
+  - VRF-to-interface mapping
+  - Automatic assignment of interfaces to VRFs
+  
+- ✅ **VLANs:**
+  - Extraction of VLAN tags from interface configurations
+  - Automatic VLAN creation with naming convention (VLAN{tag})
+  
+- ✅ **Software Version:**
+  - Extraction of PAN-OS version from `show system info`
+  - Creates Software Version objects in Nautobot
+  
+- ✅ **Cables:**
+  - LLDP neighbor discovery via `show lldp neighbors all`
+  - Automatic cable creation between interfaces
+  - Remote device and interface identification
+
+**Interface Type Detection:**
+- Physical interfaces: `1000base-t`
+- Logical interfaces (sub-interfaces, loopbacks, tunnels, mgmt): `virtual`
+
+#### Known Limitations
+
+- ⚠️ **MAC Addresses:** Not available from running config, defaults to empty string
+- ⚠️ **Link Status:** Defaults to `true` (not available in running config, requires operational state)
+- ⚠️ **MTU:** Defaults to `1500` (not parsed from config, can be customized if needed)
+- ⚠️ **Software Version:** Returns `unknown` if `sw-version` line is not found in `show system info` output
+
+#### Technical Implementation Details
+
+**Single Command Limitation Workaround:**
+Due to a limitation in the `nautobot-device-onboarding` plugin where it does not properly merge outputs from multiple commands with different `jpath` values, this override uses a single comprehensive command (`show config running`) and parses all interface, VRF, and VLAN data using complex Jinja2 post-processors.
+
+**Jinja2 Parsing Strategy:**
+- Uses brace-level tracking to parse nested PAN-OS configuration structure
+- Maintains state using Jinja2 `namespace()` for complex multi-pass parsing
+- Handles parent/sub-interface relationships by analyzing interface names
+- Maps VRFs to interfaces by tracking virtual-router sections
 
 **Documentation:**
 - See `SCHEMA_REFERENCE.md` for detailed schema documentation
@@ -186,6 +278,19 @@ This will:
 
 ### Palo Alto PAN-OS (paloalto_panos.yml)
 
+- **v2.2** (2026-01-01) - Advanced Network Data Sync
+  - ✅ Added comprehensive `sync_network_data` section
+  - ✅ Software version extraction and synchronization
+  - ✅ VRF extraction and interface-to-VRF mapping
+  - ✅ VLAN extraction with automatic VLAN creation
+  - ✅ LLDP-based cable discovery
+  - ✅ Enhanced interface parsing with sub-interface support
+  - ✅ Management interface (`mgmt`) handling
+  - ✅ Improved 802.1Q mode detection (access/tagged)
+  - ✅ Tagged and untagged VLAN assignments
+  - ✅ Fixed YAML indentation for proper plugin loading
+  - ✅ Production tested and validated
+
 - **v2.1** (2025-12-31) - Production ready
   - Added trunk interface detection
   - VRF parsing (disabled for plugin compatibility)
@@ -212,5 +317,5 @@ For issues or questions:
 
 ---
 
-**Last Updated:** December 31, 2025
+**Last Updated:** January 1, 2026
 
