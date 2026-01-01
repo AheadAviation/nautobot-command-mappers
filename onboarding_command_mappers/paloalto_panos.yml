@@ -59,6 +59,36 @@ sync_devices:
           {%- endfor -%}
           {{ result }}
 
+  device_type:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set manufacturer = 'Palo Alto Networks' -%}
+          {%- set model = '' -%}
+          {%- for line in lines -%}
+            {%- if 'model:' in line.lower() -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set model = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if model -%}
+            {{ manufacturer }} {{ model }}
+          {%- else -%}
+            {{ manufacturer }} PA-VM
+          {%- endif -%}
+
+  platform:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "paloalto_panos"
+
   version:
     commands:
       - command: "show system info"
@@ -125,7 +155,43 @@ sync_devices:
             {%- if 'ip-address:' in line.lower() -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ip_part = parts[1].strip() -%}
+                {%- if '/' in ip_part -%}
+                  {{ ip_part.split('/')[0].strip() }}
+                {%- else -%}
+                  {{ ip_part }}
+                {%- endif -%}
+                {%- set result = ip_part -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if not result -%}
+            {{ '' }}
+          {%- endif -%}
+
+  mgmt_interface:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "mgmt"
+
+  mask_length:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set result = '24' -%}
+          {%- for line in lines -%}
+            {%- if 'ip-address:' in line.lower() -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ip_part = parts[1].strip() -%}
+                {%- if '/' in ip_part -%}
+                  {%- set result = ip_part.split('/')[1].strip() -%}
+                {%- endif -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
