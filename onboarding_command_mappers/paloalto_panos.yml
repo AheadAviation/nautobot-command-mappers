@@ -48,17 +48,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set result = 'PA-VM' -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() -%}
+            {%- if 'model:' in line.lower() and result == 'PA-VM' -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
-                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result if result else 'PA-VM' }}
+          {{ result }}
 
   device_type:
     commands:
@@ -117,15 +116,14 @@ sync_devices:
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'hostname:' in line.lower() -%}
+            {%- if 'hostname:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
-                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result if result else '' }}
+          {{ result }}
 
   serial:
     commands:
@@ -136,15 +134,14 @@ sync_devices:
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'serial:' in line.lower() -%}
+            {%- if 'serial:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set result = parts[1].strip() -%}
-                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result if result else '' }}
+          {{ result }}
 
   mgmt_ip:
     commands:
@@ -155,22 +152,19 @@ sync_devices:
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() -%}
+            {%- if 'ip-address:' in line.lower() and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {{ ip_part.split('/')[0].strip() }}
+                  {%- set result = ip_part.split('/')[0].strip() -%}
                 {%- else -%}
-                  {{ ip_part }}
+                  {%- set result = ip_part -%}
                 {%- endif -%}
-                {%- set result = ip_part -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not result -%}
-            {{ '' }}
-          {%- endif -%}
+          {{ result }}
 
   mgmt_interface:
     commands:
@@ -188,14 +182,13 @@ sync_devices:
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set result = '24' -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() -%}
+            {%- if 'ip-address:' in line.lower() and result == '24' -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
                   {%- set result = ip_part.split('/')[1].strip() -%}
                 {%- endif -%}
-                {%- break -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
