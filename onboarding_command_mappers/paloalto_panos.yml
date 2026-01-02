@@ -243,10 +243,9 @@ sync_network_data:
     commands:
       - command: "show lldp neighbors all"
         parser: "raw"
-        jpath: "@"
+        jpath: "raw"
         post_processor: |
-          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set cables = [] -%}
           {# Simple LLDP parser #}
           {%- set ns = namespace(local_port=none) -%}
