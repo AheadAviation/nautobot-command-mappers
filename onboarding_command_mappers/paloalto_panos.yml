@@ -357,7 +357,7 @@ sync_network_data:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set mgmt_ip_from_pre = mgmt_ip_map if mgmt_ip_map else '' -%}
+          {%- set mgmt_ip_from_pre = mgmt_ip_map | default('', true) -%}
           {%- set ns = namespace(
               config_interfaces={},
               vrf_map={},
@@ -481,11 +481,8 @@ sync_network_data:
                   {%- endif -%}
                 {%- endif -%}
               {%- endfor -%}
-              {%- if tagged_vlans | length > 0 -%}
-                {%- set dot1q_mode = 'tagged' -%}
-              {%- endif -%}
             {%- endif -%}
-            {%- if tagged_vlans | length > 0 and dot1q_mode != 'tagged' -%}
+            {%- if tagged_vlans | length > 0 -%}
               {%- set dot1q_mode = 'tagged' -%}
             {%- endif -%}
 
