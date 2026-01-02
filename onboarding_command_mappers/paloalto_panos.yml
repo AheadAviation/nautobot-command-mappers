@@ -368,7 +368,9 @@ sync_network_data:
               vr_start_level=0,
               current_vr=none,
               expect_ip=false,
-              mgmt_ip=mgmt_ip_from_pre
+              mgmt_ip=mgmt_ip_from_pre,
+              in_deviceconfig=false,
+              deviceconfig_level=0
           ) -%}
 
           {%- for line in lines -%}
@@ -377,7 +379,10 @@ sync_network_data:
             {%- if stripped.endswith('{') -%}
               {%- set ns.brace_level = ns.brace_level + 1 -%}
               
-              {%- if 'virtual-router {' in stripped -%}
+              {%- if 'deviceconfig {' in stripped -%}
+                {%- set ns.in_deviceconfig = true -%}
+                {%- set ns.deviceconfig_level = ns.brace_level -%}
+              {%- elif 'virtual-router {' in stripped -%}
                 {%- set ns.in_virtual_router = true -%}
                 {%- set ns.vr_start_level = ns.brace_level -%}
               {%- elif ns.in_virtual_router and ns.brace_level == ns.vr_start_level + 1 -%}
@@ -414,8 +419,8 @@ sync_network_data:
                 {%- set _ = ns.config_interfaces[ns.current_iface].update({"description": desc.strip('"')}) -%}
               {%- endif -%}
             
-            {%- elif 'ip-address ' in stripped and 'deviceconfig' in stripped -%}
-              {%- set m_ip = stripped.split()[-1].rstrip(';') -%}
+            {%- elif ns.in_deviceconfig and 'ip-address ' in stripped -%}
+              {%- set m_ip = stripped.split('ip-address', 1)[1].strip().rstrip(';') -%}
               {%- if m_ip and '.' in m_ip -%}
                 {%- set ns.mgmt_ip = m_ip -%}
               {%- endif -%}
@@ -431,6 +436,10 @@ sync_network_data:
               {%- if ns.current_iface and ns.brace_level == ns.iface_brace_level -%}
                 {%- set ns.current_iface = none -%}
                 {%- set ns.iface_brace_level = 0 -%}
+              {%- endif -%}
+              {%- if ns.in_deviceconfig and ns.brace_level == ns.deviceconfig_level -%}
+                {%- set ns.in_deviceconfig = false -%}
+                {%- set ns.deviceconfig_level = 0 -%}
               {%- endif -%}
               {%- if ns.in_virtual_router and ns.brace_level == ns.vr_start_level -%}
                 {%- set ns.in_virtual_router = false -%}
