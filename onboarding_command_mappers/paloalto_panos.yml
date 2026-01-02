@@ -48,16 +48,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() and not result -%}
+            {%- if 'model:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   device_type:
     commands:
@@ -67,17 +67,17 @@ sync_devices:
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set manufacturer = 'Palo Alto Networks' -%}
-          {%- set model = '' -%}
+          {%- set ns = namespace(model='') -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() and not model -%}
+            {%- if 'model:' in line.lower() and not ns.model -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set model = parts[1].strip() -%}
+                {%- set ns.model = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if model -%}
-            {{ manufacturer }} {{ model }}
+          {%- if ns.model -%}
+            {{ manufacturer }} {{ ns.model }}
           {%- else -%}
             {{ manufacturer }}
           {%- endif -%}
@@ -96,16 +96,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'sw-version:' in line.lower() -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   hostname:
     commands:
@@ -114,16 +114,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'hostname:' in line.lower() and not result -%}
+            {%- if 'hostname:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   serial:
     commands:
@@ -132,16 +132,16 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'serial:' in line.lower() and not result -%}
+            {%- if 'serial:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   mgmt_ip:
     commands:
@@ -150,21 +150,21 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() and not result -%}
+            {%- if 'ip-address:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {%- set result = ip_part.split('/')[0].strip() -%}
+                  {%- set ns.result = ip_part.split('/')[0].strip() -%}
                 {%- else -%}
-                  {%- set result = ip_part -%}
+                  {%- set ns.result = ip_part -%}
                 {%- endif -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   mgmt_interface:
     commands:
@@ -180,21 +180,21 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() and not result -%}
+            {%- if 'ip-address:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {%- set result = ip_part.split('/')[1].strip() -%}
+                  {%- set ns.result = ip_part.split('/')[1].strip() -%}
                 {%- else -%}
-                  {%- set result = '24' -%}
+                  {%- set ns.result = '24' -%}
                 {%- endif -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result if result else '24' }}
+          {{ ns.result if ns.result else '24' }}
 
 sync_network_data:
   serial:
