@@ -48,7 +48,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
             {%- if 'model:' in line.lower() -%}
@@ -67,7 +67,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set manufacturer = 'Palo Alto Networks' -%}
           {%- set model = '' -%}
           {%- for line in lines -%}
@@ -98,7 +98,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
             {%- if 'sw-version:' in line.lower() -%}
@@ -117,7 +117,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
             {%- if 'hostname:' in line.lower() -%}
@@ -136,7 +136,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() -%}
@@ -155,7 +155,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
             {%- if 'ip-address:' in line.lower() -%}
@@ -189,7 +189,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '24' -%}
           {%- for line in lines -%}
             {%- if 'ip-address:' in line.lower() -%}
@@ -212,7 +212,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and ':' in line -%}
               {{ line.split(':', 1)[1].strip() }}
@@ -226,7 +226,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = 'unknown' -%}
           {%- for line in lines -%}
             {%- set lower_line = line.lower() -%}
@@ -246,7 +246,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set cables = [] -%}
           {# Simple LLDP parser #}
           {%- set ns = namespace(local_port=none) -%}
@@ -274,7 +274,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vrfs = {} -%}
           {%- set ns = namespace(in_vr=false, level=0, vr_level=-1, current_vr=none) -%}
           {%- for line in lines -%}
@@ -309,7 +309,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vlans = {} -%}
           {%- for line in lines -%}
             {%- set stripped = line.strip() -%}
@@ -335,7 +335,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(
               config_interfaces={},
               vrf_map={},
@@ -517,7 +517,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'model:' in line.lower() and not ns.result -%}
@@ -536,7 +536,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set manufacturer = 'Palo Alto Networks' -%}
           {%- set ns = namespace(model='') -%}
           {%- for line in lines -%}
@@ -567,7 +567,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'sw-version:' in line.lower() -%}
@@ -586,7 +586,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'hostname:' in line.lower() and not ns.result -%}
@@ -605,7 +605,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and not ns.result -%}
@@ -624,7 +624,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'ip-address:' in line.lower() and not ns.result -%}
@@ -655,7 +655,7 @@ sync_devices:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
             {%- if 'ip-address:' in line.lower() and not ns.result -%}
@@ -680,7 +680,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and ':' in line -%}
               {{ line.split(':', 1)[1].strip() }}
@@ -694,7 +694,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = 'unknown' -%}
           {%- for line in lines -%}
             {%- set lower_line = line.lower() -%}
@@ -714,7 +714,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set cables = [] -%}
           {# Simple LLDP parser #}
           {%- set ns = namespace(local_port=none) -%}
@@ -742,7 +742,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vrfs = {} -%}
           {%- set ns = namespace(in_vr=false, level=0, vr_level=-1, current_vr=none) -%}
           {%- for line in lines -%}
@@ -777,7 +777,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vlans = {} -%}
           {%- for line in lines -%}
             {%- set stripped = line.strip() -%}
@@ -803,7 +803,7 @@ sync_network_data:
         jpath: "@"
         post_processor: |
           {%- set raw_obj = obj.raw if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace(\'\r\', \'\').split(\'\n\') -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(
               config_interfaces={},
               vrf_map={},
