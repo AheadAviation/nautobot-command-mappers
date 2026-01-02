@@ -209,10 +209,9 @@ sync_network_data:
     commands:
       - command: "show system info"
         parser: "raw"
-        jpath: "@"
+        jpath: "raw"
         post_processor: |
-          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and ':' in line -%}
               {{ line.split(':', 1)[1].strip() }}
@@ -223,10 +222,9 @@ sync_network_data:
     commands:
       - command: "show system info"
         parser: "raw"
-        jpath: "@"
+        jpath: "raw"
         post_processor: |
-          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set result = 'unknown' -%}
           {%- for line in lines -%}
             {%- set lower_line = line.lower() -%}
