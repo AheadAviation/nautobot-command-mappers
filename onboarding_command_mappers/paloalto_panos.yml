@@ -47,16 +47,17 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set ns = namespace(result='') -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() and not ns.result -%}
+            {%- set lower_line = line.lower().strip() -%}
+            {%- if 'model' in lower_line and ':' in line and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set ns.result = parts[1].strip() -%}
+                {%- set result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ ns.result }}
+          {{ result }}
 
   device_type:
     commands:
@@ -113,16 +114,17 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set ns = namespace(result='') -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'hostname:' in line.lower() and not ns.result -%}
+            {%- set lower_line = line.lower().strip() -%}
+            {%- if 'hostname' in lower_line and ':' in line and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set ns.result = parts[1].strip() -%}
+                {%- set result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ ns.result }}
+          {{ result }}
 
   serial:
     commands:
@@ -131,16 +133,17 @@ sync_devices:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set ns = namespace(result='') -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
-            {%- if 'serial:' in line.lower() and not ns.result -%}
+            {%- set lower_line = line.lower().strip() -%}
+            {%- if 'serial' in lower_line and ':' in line and not result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set ns.result = parts[1].strip() -%}
+                {%- set result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ ns.result }}
+          {{ result }}
 
   mgmt_ip:
     commands:
