@@ -1,0 +1,455 @@
+# Platform: Palo Alto PAN-OS
+# Network Driver: paloalto_panos
+# Compatible Versions: PAN-OS 8.0+
+#
+# IMPORTANT: Connection Timeout Configuration
+# ===========================================
+# Palo Alto devices may require increased timeouts for prompt detection.
+# Add the following to your nautobot_config.py PLUGINS_CONFIG:
+#
+# "nautobot_device_onboarding": {
+#     "netmiko_optional_args": {
+#         "read_timeout": 60,  # Increase from default 20s for slow devices
+#         "timeout": 90,
+#         "banner_timeout": 60,
+#         "global_delay_factor": 3,
+#         "fast_cli": False,
+#     },
+# },
+#
+# Also add to nautobot_plugin_nornir connection_options:
+#
+# "nautobot_plugin_nornir": {
+#     "connection_options": {
+#         "netmiko": {
+#             "extras": {
+#                 "read_timeout": 60,
+#                 "read_timeout_override": 60,
+#             }
+#         }
+#     }
+# }
+#
+# After updating config, restart: docker-compose restart nautobot celery_worker
+
+sync_devices:
+  manufacturer:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "Palo Alto Networks"
+
+  model:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(result='') -%}
+          {%- for line in lines -%}
+            {%- if 'model:' in line.lower() and not ns.result -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ns.result = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.result }}
+
+  device_type:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set manufacturer = 'Palo Alto Networks' -%}
+          {%- set ns = namespace(model='') -%}
+          {%- for line in lines -%}
+            {%- if 'model:' in line.lower() and not ns.model -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ns.model = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if ns.model -%}
+            {{ manufacturer }} {{ ns.model }}
+          {%- else -%}
+            {{ manufacturer }}
+          {%- endif -%}
+
+  platform:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "paloalto_panos"
+
+  version:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(result='') -%}
+          {%- for line in lines -%}
+            {%- if 'sw-version:' in line.lower() -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ns.result = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.result }}
+
+  hostname:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(result='') -%}
+          {%- for line in lines -%}
+            {%- if 'hostname:' in line.lower() and not ns.result -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ns.result = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.result }}
+
+  serial:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(result='') -%}
+          {%- for line in lines -%}
+            {%- if 'serial:' in line.lower() and not ns.result -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ns.result = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.result }}
+
+  mgmt_ip:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(result='') -%}
+          {%- for line in lines -%}
+            {%- if 'ip-address:' in line.lower() and not ns.result -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ip_part = parts[1].strip() -%}
+                {%- if '/' in ip_part -%}
+                  {%- set ns.result = ip_part.split('/')[0].strip() -%}
+                {%- else -%}
+                  {%- set ns.result = ip_part -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.result }}
+
+  mgmt_interface:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: "mgmt"
+
+  mask_length:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(result='') -%}
+          {%- for line in lines -%}
+            {%- if 'ip-address:' in line.lower() and not ns.result -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set ip_part = parts[1].strip() -%}
+                {%- if '/' in ip_part -%}
+                  {%- set ns.result = ip_part.split('/')[1].strip() -%}
+                {%- else -%}
+                  {%- set ns.result = '24' -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ ns.result if ns.result else '24' }}
+
+sync_network_data:
+  serial:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- for line in lines -%}
+            {%- if 'serial:' in line.lower() and ':' in line -%}
+              {{ line.split(':', 1)[1].strip() }}
+            {%- endif -%}
+          {%- endfor -%}
+
+  software_version:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set result = 'unknown' -%}
+          {%- for line in lines -%}
+            {%- set lower_line = line.lower() -%}
+            {%- if 'sw-version' in lower_line -%}
+              {%- set parts = line.split(':', 1) -%}
+              {%- if parts | length > 1 -%}
+                {%- set result = parts[1].strip() -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ result }}
+
+  cables:
+    commands:
+      - command: "show lldp neighbors all"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set cables = [] -%}
+          {# Simple LLDP parser #}
+          {%- set ns = namespace(local_port=none) -%}
+          {%- for line in lines -%}
+            {%- if 'Local Interface:' in line -%}
+              {%- set ns.local_port = line.split(':', 1)[1].strip() -%}
+            {%- elif 'Port ID:' in line and ns.local_port -%}
+              {%- set remote_port = line.split(':', 1)[1].strip() -%}
+            {%- elif 'System Name:' in line and ns.local_port -%}
+              {%- set remote_device = line.split(':', 1)[1].strip() -%}
+              {%- set _ = cables.append({
+                "local_interface": ns.local_port,
+                "remote_interface": remote_port,
+                "remote_device": remote_device
+              }) -%}
+              {%- set ns.local_port = none -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ cables | tojson }}
+
+  vrfs:
+    commands:
+      - command: "show config running"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set vrfs = {} -%}
+          {%- set ns = namespace(in_vr=false, level=0, vr_level=-1, current_vr=none) -%}
+          {%- for line in lines -%}
+            {%- set stripped = line.strip() -%}
+            {%- if stripped.endswith('{') -%}
+              {%- set ns.level = ns.level + 1 -%}
+              {%- if 'virtual-router {' in stripped -%}
+                {%- set ns.in_vr = true -%}
+                {%- set ns.vr_level = ns.level -%}
+              {%- elif ns.in_vr and ns.level == ns.vr_level + 1 -%}
+                {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
+                {%- if ns.current_vr not in vrfs -%}
+                  {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "description": "Imported from Palo Alto"}}) -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- elif stripped.endswith('}') -%}
+              {%- if ns.level == ns.vr_level -%}
+                {%- set ns.in_vr = false -%}
+                {%- set ns.vr_level = -1 -%}
+              {%- elif ns.level == ns.vr_level + 1 -%}
+                {%- set ns.current_vr = none -%}
+              {%- endif -%}
+              {%- set ns.level = ns.level - 1 -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ vrfs | tojson }}
+
+  vlans:
+    commands:
+      - command: "show config running"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set vlans = {} -%}
+          {%- for line in lines -%}
+            {%- set stripped = line.strip() -%}
+            {%- if 'tag ' in stripped and stripped.endswith(';') -%}
+              {%- set parts = stripped.rstrip(';').split() -%}
+              {%- if parts[0] == 'tag' -%}
+                {%- set tag = parts[1] | int(default=-1) -%}
+                {%- if tag > 0 and tag < 4095 -%}
+                  {%- set tag_str = tag | string -%}
+                  {%- if tag_str not in vlans -%}
+                    {%- set _ = vlans.update({tag_str: {"vid": tag, "name": "VLAN" ~ tag_str, "status": "active"}}) -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ vlans | tojson }}
+
+  interfaces:
+    commands:
+      - command: "show config running"
+        parser: "raw"
+        jpath: "raw"
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set ns = namespace(
+              config_interfaces={},
+              vrf_map={},
+              current_iface=none,
+              iface_brace_level=0,
+              brace_level=0,
+              in_virtual_router=false,
+              vr_start_level=0,
+              current_vr=none,
+              expect_ip=false,
+              mgmt_ip=none
+          ) -%}
+
+          {%- for line in lines -%}
+            {%- set stripped = line.strip() -%}
+            
+            {%- if stripped.endswith('{') -%}
+              {%- set ns.brace_level = ns.brace_level + 1 -%}
+              
+              {%- if 'virtual-router {' in stripped -%}
+                {%- set ns.in_virtual_router = true -%}
+                {%- set ns.vr_start_level = ns.brace_level -%}
+              {%- elif ns.in_virtual_router and ns.brace_level == ns.vr_start_level + 1 -%}
+                {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
+              
+              {%- elif (stripped.startswith('ethernet') or stripped.startswith('loopback') or stripped.startswith('tunnel')) -%}
+                {%- set if_name = stripped.split('{')[0].strip() -%}
+                {%- if if_name not in ['ethernet', 'loopback', 'tunnel', 'ethernet-powerlink'] -%}
+                  {%- set ns.current_iface = if_name -%}
+                  {%- set ns.iface_brace_level = ns.brace_level -%}
+                  {%- if ns.current_iface not in ns.config_interfaces -%}
+                    {%- set itype = 'virtual' if ('.' in ns.current_iface or 'loopback' in ns.current_iface or 'tunnel' in ns.current_iface) else '1000base-t' -%}
+                    {%- set _ = ns.config_interfaces.update({ns.current_iface: {"ip_addresses": [], "description": "", "type": itype, "vlan_tag": none}}) -%}
+                  {%- endif -%}
+                {%- endif -%}
+              
+              {%- elif ns.current_iface and 'ip {' in stripped -%}
+                {%- set ns.expect_ip = true -%}
+              {%- endif -%}
+            
+            {%- elif ns.current_iface -%}
+              {%- if ns.expect_ip and '/' in stripped -%}
+                {%- set ip_parts = stripped.rstrip(';').split('/') -%}
+                {%- if ip_parts | length == 2 -%}
+                  {%- set _ = ns.config_interfaces[ns.current_iface]["ip_addresses"].append({"ip_address": ip_parts[0], "prefix_length": ip_parts[1] | int}) -%}
+                {%- endif -%}
+              {%- elif 'tag ' in stripped and stripped.endswith(';') -%}
+                {%- set t_val = stripped.rstrip(';').split()[-1] | int(default=0) -%}
+                {%- if t_val > 0 -%}
+                  {%- set _ = ns.config_interfaces[ns.current_iface].update({"vlan_tag": t_val}) -%}
+                {%- endif -%}
+              {%- elif 'description ' in stripped -%}
+                {%- set desc = stripped.split('description ', 1)[1].rstrip(';') -%}
+                {%- set _ = ns.config_interfaces[ns.current_iface].update({"description": desc.strip('"')}) -%}
+              {%- endif -%}
+            
+            {%- elif 'ip-address ' in stripped and 'deviceconfig' in obj -%}
+              {%- set m_ip = stripped.split()[-1].rstrip(';') -%}
+              {%- if m_ip and '.' in m_ip -%}
+                {%- set ns.mgmt_ip = m_ip -%}
+              {%- endif -%}
+
+            {%- elif ns.in_virtual_router and ns.current_vr and 'interface [' in stripped -%}
+              {%- set if_part = stripped.split('[')[1].split(']')[0].strip() -%}
+              {%- for vrif in if_part.split() -%}
+                {%- set _ = ns.vrf_map.update({vrif: ns.current_vr}) -%}
+              {%- endfor -%}
+            {%- endif -%}
+
+            {%- if stripped == '}' -%}
+              {%- if ns.current_iface and ns.brace_level == ns.iface_brace_level -%}
+                {%- set ns.current_iface = none -%}
+                {%- set ns.iface_brace_level = 0 -%}
+              {%- endif -%}
+              {%- if ns.in_virtual_router and ns.brace_level == ns.vr_start_level -%}
+                {%- set ns.in_virtual_router = false -%}
+                {%- set ns.vr_start_level = 0 -%}
+              {%- endif -%}
+              {%- if ns.current_vr and ns.brace_level == ns.vr_start_level + 1 -%}
+                {%- set ns.current_vr = none -%}
+              {%- endif -%}
+              {%- if ns.expect_ip -%} {%- set ns.expect_ip = false -%} {%- endif -%}
+              {%- set ns.brace_level = ns.brace_level - 1 -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+          {%- if ns.mgmt_ip -%}
+            {%- set _ = ns.config_interfaces.update({"mgmt": {"ip_addresses": [{"ip_address": ns.mgmt_ip, "prefix_length": 24}], "description": "Management Interface", "type": "virtual"}}) -%}
+          {%- endif -%}
+
+          {%- set result_interfaces = {} -%}
+          {%- for name, config in ns.config_interfaces.items() -%}
+            {%- set is_sub = '.' in name -%}
+            {%- set is_parent = not is_sub -%}
+            {%- set vrf_name = ns.vrf_map.get(name) -%}
+            {%- set iface_vrf = {"name": vrf_name} if vrf_name else none -%}
+            {%- set dot1q_mode = '' -%}
+            {%- set untagged_vlan = none -%}
+            {%- set tagged_vlans = [] -%}
+            {%- if is_sub and config.get('vlan_tag') -%}
+              {%- set dot1q_mode = 'access' -%}
+              {%- set tag = config.get('vlan_tag') -%}
+              {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
+            {%- elif is_parent -%}
+              {%- for sub_name, sub_config in ns.config_interfaces.items() -%}
+                {%- if sub_name.startswith(name ~ '.') -%}
+                  {%- set dot1q_mode = 'tagged' -%}
+                  {%- set stag = sub_config.get('vlan_tag') -%}
+                  {%- if stag -%}
+                    {%- set _ = tagged_vlans.append({"name": "VLAN" ~ stag, "id": stag | string}) -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+
+            {%- set _ = result_interfaces.update({
+              name: {
+                "type": config.get('type', '1000base-t'),
+                "mac_address": "",
+                "mtu": "1500",
+                "description": config.get('description', ''),
+                "link_status": true,
+                "ip_addresses": config.get('ip_addresses', []),
+                "tagged_vlans": tagged_vlans,
+                "untagged_vlan": untagged_vlan,
+                "lag": "",
+                "vrf": iface_vrf,
+                "802.1Q_mode": dot1q_mode
+              }
+            }) -%}
+          {%- endfor -%}
+          {{ result_interfaces | tojson }}
