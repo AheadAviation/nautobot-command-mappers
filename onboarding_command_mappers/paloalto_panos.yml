@@ -203,11 +203,13 @@ sync_network_data:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
+          {%- set result = '' -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and ':' in line -%}
-              {{ line.split(':', 1)[1].strip() }}
+              {%- set result = line.split(':', 1)[1].strip() -%}
             {%- endif -%}
           {%- endfor -%}
+          {{ result }}
 
   software_version:
     commands:
@@ -237,20 +239,24 @@ sync_network_data:
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set cables = [] -%}
           {# Simple LLDP parser #}
-          {%- set ns = namespace(local_port=none) -%}
+          {%- set ns = namespace(local_port=none, remote_port=none, remote_device=none) -%}
           {%- for line in lines -%}
             {%- if 'Local Interface:' in line -%}
               {%- set ns.local_port = line.split(':', 1)[1].strip() -%}
+              {%- set ns.remote_port = none -%}
+              {%- set ns.remote_device = none -%}
             {%- elif 'Port ID:' in line and ns.local_port -%}
-              {%- set remote_port = line.split(':', 1)[1].strip() -%}
-            {%- elif 'System Name:' in line and ns.local_port -%}
-              {%- set remote_device = line.split(':', 1)[1].strip() -%}
+              {%- set ns.remote_port = line.split(':', 1)[1].strip() -%}
+            {%- elif 'System Name:' in line and ns.local_port and ns.remote_port -%}
+              {%- set ns.remote_device = line.split(':', 1)[1].strip() -%}
               {%- set _ = cables.append({
                 "local_interface": ns.local_port,
-                "remote_interface": remote_port,
-                "remote_device": remote_device
+                "remote_interface": ns.remote_port,
+                "remote_device": ns.remote_device
               }) -%}
               {%- set ns.local_port = none -%}
+              {%- set ns.remote_port = none -%}
+              {%- set ns.remote_device = none -%}
             {%- endif -%}
           {%- endfor -%}
           {{ cables | tojson }}
@@ -439,7 +445,7 @@ sync_network_data:
             {%- set _ = result_interfaces.update({
               name: {
                 "type": config.get('type', '1000base-t'),
-                "mac_address": "",
+                "mac_address": none,
                 "mtu": "1500",
                 "description": config.get('description', ''),
                 "link_status": true,
