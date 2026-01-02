@@ -206,26 +206,6 @@ sync_devices:
           {{ result }}
 
 sync_network_data:
-  pre_processor:
-    mgmt_ip_map:
-      commands:
-        - command: "show system info"
-          parser: "raw"
-          jpath: "@"
-          post_processor: |
-            {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-            {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-            {%- set mgmt_ip = '' -%}
-            {%- for line in lines -%}
-              {%- if 'ip-address:' in line.lower() -%}
-                {%- set parts = line.split(':', 1) -%}
-                {%- if parts | length > 1 -%}
-                  {%- set mgmt_ip = parts[1].strip() -%}
-                {%- endif -%}
-              {%- endif -%}
-            {%- endfor -%}
-            {{ mgmt_ip }}
-
   serial:
     commands:
       - command: "show system info"
@@ -353,139 +333,374 @@ sync_network_data:
     commands:
       - command: "show config running"
         parser: "raw"
-        jpath: "@"
+        jpath: "raw"
         post_processor: |
-          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set mgmt_ip_from_pre = mgmt_ip_map | default('', true) -%}
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(
               config_interfaces={},
+              all_interfaces=[],
               vrf_map={},
-              current_iface=none,
-              iface_brace_level=0,
               brace_level=0,
-              in_virtual_router=false,
-              vr_start_level=0,
-              current_vr=none,
-              expect_ip=false,
-              mgmt_ip=mgmt_ip_from_pre,
+              in_interface=false,
+              interface_brace_level=-1,
+              in_ethernet=false,
+              ethernet_brace_level=-1,
+              in_loopback=false,
+              loopback_brace_level=-1,
+              in_tunnel=false,
+              tunnel_brace_level=-1,
+              in_aggregate=false,
+              aggregate_brace_level=-1,
               in_deviceconfig=false,
-              deviceconfig_level=0
+              deviceconfig_brace_level=-1,
+              in_system=false,
+              system_brace_level=-1,
+              in_virtual_router=false,
+              vr_brace_level=-1,
+              current_vr=none,
+              in_layer3=false,
+              in_units=false,
+              current_iface=none,
+              current_subiface=none,
+              expect_ip_value=false,
+              mgmt_ip=none,
+              mgmt_mask=none
           ) -%}
-
+          {# Parse hierarchical config format using brace-level tracking #}
           {%- for line in lines -%}
             {%- set stripped = line.strip() -%}
-            
-            {%- if stripped.endswith('{') -%}
-              {%- set ns.brace_level = ns.brace_level + 1 -%}
-              
-              {%- if 'deviceconfig {' in stripped -%}
-                {%- set ns.in_deviceconfig = true -%}
-                {%- set ns.deviceconfig_level = ns.brace_level -%}
-              {%- elif 'virtual-router {' in stripped -%}
-                {%- set ns.in_virtual_router = true -%}
-                {%- set ns.vr_start_level = ns.brace_level -%}
-              {%- elif ns.in_virtual_router and ns.brace_level == ns.vr_start_level + 1 -%}
-                {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
-              
-              {%- elif (stripped.startswith('ethernet') or stripped.startswith('loopback') or stripped.startswith('tunnel')) -%}
-                {%- set if_name = stripped.split('{')[0].strip() -%}
-                {%- if if_name not in ['ethernet', 'loopback', 'tunnel', 'ethernet-powerlink'] -%}
-                  {%- set ns.current_iface = if_name -%}
-                  {%- set ns.iface_brace_level = ns.brace_level -%}
-                  {%- if ns.current_iface not in ns.config_interfaces -%}
-                    {%- set itype = 'virtual' if ('.' in ns.current_iface or 'loopback' in ns.current_iface or 'tunnel' in ns.current_iface) else '1000base-t' -%}
-                    {%- set _ = ns.config_interfaces.update({ns.current_iface: {"ip_addresses": [], "description": "", "type": itype, "vlan_tag": none}}) -%}
+            {%- if stripped -%}
+              {%- set parts = stripped.rstrip('{').rstrip('}').rstrip(';').strip().split() -%}
+              {%- if stripped.endswith('{') and parts | length > 0 -%}
+                {# Opening brace - increment level first #}
+                {%- set ns.brace_level = ns.brace_level + 1 -%}
+                {%- set key = parts[0] -%}
+                {# Track interface block (parent of ethernet, loopback, tunnel, etc.) #}
+                {%- if key == 'interface' and not ns.in_interface -%}
+                  {%- set ns.in_interface = true -%}
+                  {%- set ns.interface_brace_level = ns.brace_level -%}
+                {# Track ethernet block under interface #}
+                {%- elif key == 'ethernet' and ns.in_interface and ns.brace_level == ns.interface_brace_level + 1 -%}
+                  {%- set ns.in_ethernet = true -%}
+                  {%- set ns.ethernet_brace_level = ns.brace_level -%}
+                {# Track loopback block under interface #}
+                {%- elif key == 'loopback' and ns.in_interface and ns.brace_level == ns.interface_brace_level + 1 -%}
+                  {%- set ns.in_loopback = true -%}
+                  {%- set ns.loopback_brace_level = ns.brace_level -%}
+                {# Track tunnel block under interface #}
+                {%- elif key == 'tunnel' and ns.in_interface and ns.brace_level == ns.interface_brace_level + 1 -%}
+                  {%- set ns.in_tunnel = true -%}
+                  {%- set ns.tunnel_brace_level = ns.brace_level -%}
+                {# Track aggregate-ethernet block under interface #}
+                {%- elif key == 'aggregate-ethernet' and ns.in_interface and ns.brace_level == ns.interface_brace_level + 1 -%}
+                  {%- set ns.in_aggregate = true -%}
+                  {%- set ns.aggregate_brace_level = ns.brace_level -%}
+                {# Physical ethernet interface: ethernet1/1 { (direct child of ethernet block) #}
+                {%- elif ns.in_ethernet and ns.brace_level == ns.ethernet_brace_level + 1 -%}
+                  {%- set potential_name = key -%}
+                  {%- set has_dash = '-' in potential_name -%}
+                  {%- if not has_dash and potential_name.startswith('ethernet') and '/' in potential_name and '.' not in potential_name -%}
+                    {%- if potential_name not in ns.all_interfaces -%}
+                      {%- set _ = ns.all_interfaces.append(potential_name) -%}
+                    {%- endif -%}
+                    {%- if potential_name not in ns.config_interfaces -%}
+                      {%- set _ = ns.config_interfaces.update({potential_name: {'ip_addresses': [], 'vlan_tag': none}}) -%}
+                    {%- endif -%}
+                    {%- set ns.current_iface = potential_name -%}
+                    {%- set ns.current_subiface = none -%}
+                    {%- set ns.in_layer3 = false -%}
+                    {%- set ns.in_units = false -%}
                   {%- endif -%}
+                {# Loopback interface: loopback.1 { (direct child of loopback block under units) #}
+                {%- elif ns.in_loopback and ns.in_units and '.' in key and key.startswith('loopback') -%}
+                  {%- set potential_name = key -%}
+                  {%- if potential_name not in ns.all_interfaces -%}
+                    {%- set _ = ns.all_interfaces.append(potential_name) -%}
+                  {%- endif -%}
+                  {%- if potential_name not in ns.config_interfaces -%}
+                    {%- set _ = ns.config_interfaces.update({potential_name: {'ip_addresses': [], 'vlan_tag': none}}) -%}
+                  {%- endif -%}
+                  {%- set ns.current_iface = potential_name -%}
+                  {%- set ns.current_subiface = none -%}
+                {# Tunnel interface: tunnel.1 { (direct child of tunnel block under units) #}
+                {%- elif ns.in_tunnel and ns.in_units and '.' in key and key.startswith('tunnel') -%}
+                  {%- set potential_name = key -%}
+                  {%- if potential_name not in ns.all_interfaces -%}
+                    {%- set _ = ns.all_interfaces.append(potential_name) -%}
+                  {%- endif -%}
+                  {%- if potential_name not in ns.config_interfaces -%}
+                    {%- set _ = ns.config_interfaces.update({potential_name: {'ip_addresses': [], 'vlan_tag': none}}) -%}
+                  {%- endif -%}
+                  {%- set ns.current_iface = potential_name -%}
+                  {%- set ns.current_subiface = none -%}
+                {# Aggregate interface: ae1 { (direct child of aggregate-ethernet block) #}
+                {%- elif ns.in_aggregate and ns.brace_level == ns.aggregate_brace_level + 1 -%}
+                  {%- set potential_name = key -%}
+                  {%- set ae_suffix = potential_name[2:] if potential_name | length > 2 else 'x' -%}
+                  {%- if potential_name.startswith('ae') and (ae_suffix | int(default=-1) >= 0) -%}
+                    {%- if potential_name not in ns.all_interfaces -%}
+                      {%- set _ = ns.all_interfaces.append(potential_name) -%}
+                    {%- endif -%}
+                    {%- if potential_name not in ns.config_interfaces -%}
+                      {%- set _ = ns.config_interfaces.update({potential_name: {'ip_addresses': [], 'vlan_tag': none}}) -%}
+                    {%- endif -%}
+                    {%- set ns.current_iface = potential_name -%}
+                    {%- set ns.current_subiface = none -%}
+                    {%- set ns.in_layer3 = false -%}
+                    {%- set ns.in_units = false -%}
+                  {%- endif -%}
+                {# layer3 block under physical interface #}
+                {%- elif key == 'layer3' and ns.current_iface -%}
+                  {%- set ns.in_layer3 = true -%}
+                  {%- set ns.in_units = false -%}
+                {# units block under layer3 (contains subinterfaces) or under loopback/tunnel #}
+                {%- elif key == 'units' -%}
+                  {%- set ns.in_units = true -%}
+                {# ip block - next line will have the IP address #}
+                {%- elif key == 'ip' and (ns.current_iface or ns.current_subiface) -%}
+                  {%- set ns.expect_ip_value = true -%}
+                {# Subinterface under units: ethernet1/12.10 { #}
+                {%- elif ns.in_units and ns.in_layer3 -%}
+                  {%- set potential_subif = key -%}
+                  {%- set has_dash_subif = '-' in potential_subif -%}
+                  {%- if not has_dash_subif and '.' in potential_subif and (potential_subif.startswith('ethernet') or potential_subif.startswith('ae')) -%}
+                    {%- if potential_subif not in ns.all_interfaces -%}
+                      {%- set _ = ns.all_interfaces.append(potential_subif) -%}
+                    {%- endif -%}
+                    {%- if potential_subif not in ns.config_interfaces -%}
+                      {%- set _ = ns.config_interfaces.update({potential_subif: {'ip_addresses': [], 'vlan_tag': none}}) -%}
+                    {%- endif -%}
+                    {%- set ns.current_subiface = potential_subif -%}
+                  {%- endif -%}
+                {# deviceconfig block for management interface #}
+                {%- elif key == 'deviceconfig' -%}
+                  {%- set ns.in_deviceconfig = true -%}
+                  {%- set ns.deviceconfig_brace_level = ns.brace_level -%}
+                {%- elif key == 'system' and ns.in_deviceconfig and ns.brace_level == ns.deviceconfig_brace_level + 1 -%}
+                  {%- set ns.in_system = true -%}
+                  {%- set ns.system_brace_level = ns.brace_level -%}
+                {# virtual-router block for VRF mapping #}
+                {%- elif key == 'virtual-router' -%}
+                  {%- set ns.in_virtual_router = true -%}
+                  {%- set ns.vr_brace_level = ns.brace_level -%}
+                {# Virtual router name (direct child of virtual-router block) #}
+                {%- elif ns.in_virtual_router and ns.brace_level == ns.vr_brace_level + 1 -%}
+                  {%- set ns.current_vr = key -%}
                 {%- endif -%}
-              
-              {%- elif ns.current_iface and 'ip {' in stripped -%}
-                {%- set ns.expect_ip = true -%}
-              {%- endif -%}
-            
-            {%- elif ns.current_iface -%}
-              {%- if ns.expect_ip and '/' in stripped -%}
-                {%- set ip_parts = stripped.rstrip(';').split('/') -%}
-                {%- if ip_parts | length == 2 -%}
-                  {%- set _ = ns.config_interfaces[ns.current_iface]["ip_addresses"].append({"ip_address": ip_parts[0], "prefix_length": ip_parts[1] | int}) -%}
+              {%- elif stripped.endswith('}') -%}
+                {# Closing brace - check if exiting blocks before decrementing #}
+                {%- if ns.in_interface and ns.brace_level == ns.interface_brace_level -%}
+                  {%- set ns.in_interface = false -%}
+                  {%- set ns.interface_brace_level = -1 -%}
+                  {%- set ns.in_ethernet = false -%}
+                  {%- set ns.ethernet_brace_level = -1 -%}
+                  {%- set ns.in_loopback = false -%}
+                  {%- set ns.loopback_brace_level = -1 -%}
+                  {%- set ns.in_tunnel = false -%}
+                  {%- set ns.tunnel_brace_level = -1 -%}
+                  {%- set ns.in_aggregate = false -%}
+                  {%- set ns.aggregate_brace_level = -1 -%}
                 {%- endif -%}
-              {%- elif 'tag ' in stripped and stripped.endswith(';') -%}
-                {%- set t_val = stripped.rstrip(';').split()[-1] | int(default=0) -%}
-                {%- if t_val > 0 -%}
-                  {%- set _ = ns.config_interfaces[ns.current_iface].update({"vlan_tag": t_val}) -%}
+                {%- if ns.in_ethernet and ns.brace_level == ns.ethernet_brace_level -%}
+                  {%- set ns.in_ethernet = false -%}
+                  {%- set ns.ethernet_brace_level = -1 -%}
+                  {%- set ns.current_iface = none -%}
+                  {%- set ns.current_subiface = none -%}
+                  {%- set ns.in_layer3 = false -%}
+                  {%- set ns.in_units = false -%}
                 {%- endif -%}
-              {%- elif 'description ' in stripped -%}
-                {%- set desc = stripped.split('description ', 1)[1].rstrip(';') -%}
-                {%- set _ = ns.config_interfaces[ns.current_iface].update({"description": desc.strip('"')}) -%}
+                {%- if ns.in_loopback and ns.brace_level == ns.loopback_brace_level -%}
+                  {%- set ns.in_loopback = false -%}
+                  {%- set ns.loopback_brace_level = -1 -%}
+                  {%- set ns.in_units = false -%}
+                {%- endif -%}
+                {%- if ns.in_tunnel and ns.brace_level == ns.tunnel_brace_level -%}
+                  {%- set ns.in_tunnel = false -%}
+                  {%- set ns.tunnel_brace_level = -1 -%}
+                  {%- set ns.in_units = false -%}
+                {%- endif -%}
+                {%- if ns.in_aggregate and ns.brace_level == ns.aggregate_brace_level -%}
+                  {%- set ns.in_aggregate = false -%}
+                  {%- set ns.aggregate_brace_level = -1 -%}
+                {%- endif -%}
+                {%- if ns.in_system and ns.brace_level == ns.system_brace_level -%}
+                  {%- set ns.in_system = false -%}
+                  {%- set ns.system_brace_level = -1 -%}
+                {%- endif -%}
+                {%- if ns.in_deviceconfig and ns.brace_level == ns.deviceconfig_brace_level -%}
+                  {%- set ns.in_deviceconfig = false -%}
+                  {%- set ns.deviceconfig_brace_level = -1 -%}
+                  {%- set ns.in_system = false -%}
+                  {%- set ns.system_brace_level = -1 -%}
+                {%- endif -%}
+                {%- if ns.in_virtual_router and ns.brace_level == ns.vr_brace_level -%}
+                  {%- set ns.in_virtual_router = false -%}
+                  {%- set ns.vr_brace_level = -1 -%}
+                  {%- set ns.current_vr = none -%}
+                {%- endif -%}
+                {%- if ns.brace_level > 0 -%}
+                  {%- set ns.brace_level = ns.brace_level - 1 -%}
+                {%- endif -%}
+                {%- set ns.expect_ip_value = false -%}
+              {%- elif stripped.endswith(';') and parts | length > 0 -%}
+                {# Value line #}
+                {%- if ns.expect_ip_value -%}
+                  {# IP address value: 10.0.0.254/24; #}
+                  {%- set ip_cidr = parts[0] -%}
+                  {%- if '/' in ip_cidr -%}
+                    {%- set ip_parts = ip_cidr.split('/') -%}
+                    {%- set ip_addr = ip_parts[0] -%}
+                    {%- set prefix = ip_parts[1] | int -%}
+                    {%- set target = ns.current_subiface if ns.current_subiface else ns.current_iface -%}
+                    {%- if target and target in ns.config_interfaces -%}
+                      {%- set _ = ns.config_interfaces[target]['ip_addresses'].append({'ip_address': ip_addr, 'prefix_length': prefix}) -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                  {%- set ns.expect_ip_value = false -%}
+                {%- elif parts | length >= 2 and parts[0] == 'tag' and ns.current_subiface -%}
+                  {# VLAN tag: tag 1; #}
+                  {%- set vlan_tag = parts[1] | int -%}
+                  {%- if vlan_tag > 0 and ns.current_subiface in ns.config_interfaces -%}
+                    {%- set _ = ns.config_interfaces[ns.current_subiface].update({'vlan_tag': vlan_tag}) -%}
+                  {%- endif -%}
+                {%- elif ns.in_system and parts | length >= 2 and parts[0] == 'ip-address' -%}
+                  {# Management IP: ip-address 192.168.11.16; #}
+                  {%- set ns.mgmt_ip = parts[1] -%}
+                {%- elif ns.in_system and parts | length >= 2 and parts[0] == 'netmask' -%}
+                  {# Management netmask: netmask 255.255.255.0; #}
+                  {%- set ns.mgmt_mask = parts[1] -%}
+                {%- elif ns.current_vr and parts[0] == 'interface' -%}
+                  {# VRF interface assignment: interface [ eth1/1 eth1/2 ]; or interface eth1/1; #}
+                  {# Handle both array format and single interface format #}
+                  {%- set iface_list = [] -%}
+                  {%- for p in parts[1:] -%}
+                    {%- set cleaned = p.replace('[', '').replace(']', '').strip() -%}
+                    {%- if cleaned and cleaned not in ['[', ']'] -%}
+                      {%- set _ = iface_list.append(cleaned) -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {%- for iface in iface_list -%}
+                    {%- set _ = ns.vrf_map.update({iface: ns.current_vr}) -%}
+                  {%- endfor -%}
+                {%- endif -%}
               {%- endif -%}
-            
-            {%- elif ns.in_deviceconfig and 'ip-address ' in stripped -%}
-              {%- set m_ip = stripped.split('ip-address', 1)[1].strip().rstrip(';') -%}
-              {%- if m_ip and '.' in m_ip -%}
-                {%- set ns.mgmt_ip = m_ip -%}
-              {%- endif -%}
-
-            {%- elif ns.in_virtual_router and ns.current_vr and 'interface [' in stripped -%}
-              {%- set if_part = stripped.split('[')[1].split(']')[0].strip() -%}
-              {%- for vrif in if_part.split() -%}
-                {%- set _ = ns.vrf_map.update({vrif: ns.current_vr}) -%}
-              {%- endfor -%}
-            {%- endif -%}
-
-            {%- if stripped == '}' -%}
-              {%- if ns.current_iface and ns.brace_level == ns.iface_brace_level -%}
-                {%- set ns.current_iface = none -%}
-                {%- set ns.iface_brace_level = 0 -%}
-              {%- endif -%}
-              {%- if ns.in_deviceconfig and ns.brace_level == ns.deviceconfig_level -%}
-                {%- set ns.in_deviceconfig = false -%}
-                {%- set ns.deviceconfig_level = 0 -%}
-              {%- endif -%}
-              {%- if ns.in_virtual_router and ns.brace_level == ns.vr_start_level -%}
-                {%- set ns.in_virtual_router = false -%}
-                {%- set ns.vr_start_level = 0 -%}
-              {%- endif -%}
-              {%- if ns.current_vr and ns.brace_level == ns.vr_start_level + 1 -%}
-                {%- set ns.current_vr = none -%}
-              {%- endif -%}
-              {%- if ns.expect_ip -%} {%- set ns.expect_ip = false -%} {%- endif -%}
-              {%- set ns.brace_level = ns.brace_level - 1 -%}
             {%- endif -%}
           {%- endfor -%}
-
-          {%- if ns.mgmt_ip -%}
-            {%- set mgmt_ip_str = ns.mgmt_ip | string -%}
-            {%- if '/' in mgmt_ip_str -%}
-              {%- set mgmt_parts = mgmt_ip_str.split('/') -%}
-              {%- set mgmt_addr = mgmt_parts[0] -%}
-              {%- set mgmt_prefix = mgmt_parts[1] | int -%}
-            {%- else -%}
-              {%- set mgmt_addr = mgmt_ip_str -%}
-              {%- set mgmt_prefix = 24 -%}
+          {# Add management interface if found #}
+          {%- if ns.mgmt_ip and ns.mgmt_mask -%}
+            {%- if 'management' not in ns.all_interfaces -%}
+              {%- set _ = ns.all_interfaces.append('management') -%}
             {%- endif -%}
-            {%- set _ = ns.config_interfaces.update({"mgmt": {"ip_addresses": [{"ip_address": mgmt_addr, "prefix_length": mgmt_prefix}], "description": "Management Interface", "type": "virtual"}}) -%}
-          {%- else -%}
-            {%- set _ = ns.config_interfaces.update({"mgmt": {"ip_addresses": [], "description": "Management Interface", "type": "virtual"}}) -%}
+            {%- set octets = ns.mgmt_mask.split('.') -%}
+            {%- set prefix_bits = 0 -%}
+            {# Convert each octet to bits (unrolled loop since Jinja2 can't accumulate in loops) #}
+            {%- if octets | length >= 1 -%}
+              {%- set val = octets[0] | int -%}
+              {%- if val == 255 -%}{%- set prefix_bits = prefix_bits + 8 -%}
+              {%- elif val == 254 -%}{%- set prefix_bits = prefix_bits + 7 -%}
+              {%- elif val == 252 -%}{%- set prefix_bits = prefix_bits + 6 -%}
+              {%- elif val == 248 -%}{%- set prefix_bits = prefix_bits + 5 -%}
+              {%- elif val == 240 -%}{%- set prefix_bits = prefix_bits + 4 -%}
+              {%- elif val == 224 -%}{%- set prefix_bits = prefix_bits + 3 -%}
+              {%- elif val == 192 -%}{%- set prefix_bits = prefix_bits + 2 -%}
+              {%- elif val == 128 -%}{%- set prefix_bits = prefix_bits + 1 -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- if octets | length >= 2 -%}
+              {%- set val = octets[1] | int -%}
+              {%- if val == 255 -%}{%- set prefix_bits = prefix_bits + 8 -%}
+              {%- elif val == 254 -%}{%- set prefix_bits = prefix_bits + 7 -%}
+              {%- elif val == 252 -%}{%- set prefix_bits = prefix_bits + 6 -%}
+              {%- elif val == 248 -%}{%- set prefix_bits = prefix_bits + 5 -%}
+              {%- elif val == 240 -%}{%- set prefix_bits = prefix_bits + 4 -%}
+              {%- elif val == 224 -%}{%- set prefix_bits = prefix_bits + 3 -%}
+              {%- elif val == 192 -%}{%- set prefix_bits = prefix_bits + 2 -%}
+              {%- elif val == 128 -%}{%- set prefix_bits = prefix_bits + 1 -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- if octets | length >= 3 -%}
+              {%- set val = octets[2] | int -%}
+              {%- if val == 255 -%}{%- set prefix_bits = prefix_bits + 8 -%}
+              {%- elif val == 254 -%}{%- set prefix_bits = prefix_bits + 7 -%}
+              {%- elif val == 252 -%}{%- set prefix_bits = prefix_bits + 6 -%}
+              {%- elif val == 248 -%}{%- set prefix_bits = prefix_bits + 5 -%}
+              {%- elif val == 240 -%}{%- set prefix_bits = prefix_bits + 4 -%}
+              {%- elif val == 224 -%}{%- set prefix_bits = prefix_bits + 3 -%}
+              {%- elif val == 192 -%}{%- set prefix_bits = prefix_bits + 2 -%}
+              {%- elif val == 128 -%}{%- set prefix_bits = prefix_bits + 1 -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- if octets | length >= 4 -%}
+              {%- set val = octets[3] | int -%}
+              {%- if val == 255 -%}{%- set prefix_bits = prefix_bits + 8 -%}
+              {%- elif val == 254 -%}{%- set prefix_bits = prefix_bits + 7 -%}
+              {%- elif val == 252 -%}{%- set prefix_bits = prefix_bits + 6 -%}
+              {%- elif val == 248 -%}{%- set prefix_bits = prefix_bits + 5 -%}
+              {%- elif val == 240 -%}{%- set prefix_bits = prefix_bits + 4 -%}
+              {%- elif val == 224 -%}{%- set prefix_bits = prefix_bits + 3 -%}
+              {%- elif val == 192 -%}{%- set prefix_bits = prefix_bits + 2 -%}
+              {%- elif val == 128 -%}{%- set prefix_bits = prefix_bits + 1 -%}
+              {%- endif -%}
+            {%- endif -%}
+            {%- set _ = ns.config_interfaces.update({'management': {'ip_addresses': [{'ip_address': ns.mgmt_ip, 'prefix_length': prefix_bits}], 'vlan_tag': none}}) -%}
           {%- endif -%}
-
-          {%- set result_interfaces = {} -%}
-          {%- for name, config in ns.config_interfaces.items() -%}
-            {%- set is_mgmt = (name == 'mgmt') -%}
-            {%- set is_sub = '.' in name -%}
-            {%- set is_parent = not is_sub and not is_mgmt -%}
-            {%- set vrf_name = ns.vrf_map.get(name) -%}
-            {%- set iface_vrf = {"name": vrf_name} if vrf_name else none -%}
-            {%- set dot1q_mode = '' -%}
-            {%- set untagged_vlan = none -%}
-            {%- set tagged_vlans = [] -%}
-            {%- if not is_mgmt -%}
+          {# Build interfaces dictionary from config data #}
+          {%- set interfaces = {} -%}
+          {# First pass: identify parent interfaces that have subinterfaces #}
+          {%- set parent_interfaces = [] -%}
+          {%- for name in ns.all_interfaces -%}
+            {%- if '.' in name -%}
+              {# This is a subinterface, extract parent name #}
+              {%- set parent = name.split('.')[0] -%}
+              {%- if parent not in parent_interfaces -%}
+                {%- set _ = parent_interfaces.append(parent) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {# Second pass: build interface dictionaries #}
+          {%- for name in ns.all_interfaces | sort -%}
+            {# Skip meaningless virtual/system interfaces #}
+            {%- if name not in ['vlan', 'tunnel', 'loopback', 'name'] -%}
+              {%- set is_sub = '.' in name -%}
+              {%- set is_parent = name in parent_interfaces -%}
+              {%- set config = ns.config_interfaces.get(name, {}) -%}
+              {# Determine interface type dynamically based on naming convention #}
+              {%- set iface_type = 'other' -%}
+              {%- if is_sub -%}
+                {%- set iface_type = 'virtual' -%}
+              {%- elif 'ethernet' in name.lower() and '/' in name -%}
+                {%- set iface_type = '1000base-t' -%}
+              {%- elif name.startswith('ae') -%}
+                {%- set iface_type = 'lag' -%}
+              {%- elif 'loopback' in name.lower() -%}
+                {%- set iface_type = 'virtual' -%}
+              {%- elif 'tunnel' in name.lower() -%}
+                {%- set iface_type = 'virtual' -%}
+              {%- elif name == 'management' -%}
+                {%- set iface_type = '1000base-t' -%}
+              {%- endif -%}
+              {# Get IP addresses from config #}
+              {%- set ip_addresses = config.get('ip_addresses', []) -%}
+              {# Get VRF from vrf_map if available #}
+              {# NOTE: VRF assignment disabled - plugin expects null, not string names #}
+              {# VRFs must be manually assigned in Nautobot after onboarding #}
+              {%- set iface_vrf = none -%}
+              {# Determine 802.1Q mode #}
+              {%- set dot1q_mode = '' -%}
+              {%- set untagged_vlan = none -%}
+              {%- set tagged_vlans = [] -%}
               {%- if is_sub and config.get('vlan_tag') -%}
+                {# Subinterface with VLAN tag - access mode #}
                 {%- set dot1q_mode = 'access' -%}
                 {%- set tag = config.get('vlan_tag') -%}
                 {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
               {%- elif is_parent -%}
-                {%- for sub_name, sub_config in ns.config_interfaces.items() -%}
+                {# Physical interface with subinterfaces - tagged/trunk mode #}
+                {%- set dot1q_mode = 'tagged' -%}
+                {# Collect all VLAN tags from subinterfaces #}
+                {%- for sub_name in ns.all_interfaces -%}
                   {%- if sub_name.startswith(name ~ '.') -%}
+                    {%- set sub_config = ns.config_interfaces.get(sub_name, {}) -%}
                     {%- set stag = sub_config.get('vlan_tag') -%}
                     {%- if stag -%}
                       {%- set _ = tagged_vlans.append({"name": "VLAN" ~ stag, "id": stag | string}) -%}
@@ -493,26 +708,25 @@ sync_network_data:
                   {%- endif -%}
                 {%- endfor -%}
               {%- endif -%}
-              {%- if tagged_vlans | length > 0 -%}
-                {%- set dot1q_mode = 'tagged' -%}
+              {# Build interface dict with required SSoT fields #}
+              {%- set iface_dict = {
+                'type': iface_type,
+                'mac_address': none,
+                'mtu': '1500',
+                'description': '',
+                'link_status': true,
+                'ip_addresses': ip_addresses,
+                'tagged_vlans': tagged_vlans,
+                'untagged_vlan': untagged_vlan,
+                'lag': '',
+                'vrf': iface_vrf,
+                '802.1Q_mode': dot1q_mode
+              } -%}
+              {# Add mgmt_only flag for management interface #}
+              {%- if name == 'management' -%}
+                {%- set _ = iface_dict.update({'mgmt_only': true}) -%}
               {%- endif -%}
+              {%- set _ = interfaces.update({name: iface_dict}) -%}
             {%- endif -%}
-
-            {%- set _ = result_interfaces.update({
-              name: {
-                "type": config.get('type', '1000base-t'),
-                "mac_address": none,
-                "mtu": "1500",
-                "description": config.get('description', ''),
-                "link_status": true,
-                "ip_addresses": config.get('ip_addresses', []),
-                "tagged_vlans": tagged_vlans,
-                "untagged_vlan": untagged_vlan,
-                "lag": "",
-                "vrf": iface_vrf,
-                "802.1Q_mode": dot1q_mode,
-                "mgmt_only": is_mgmt
-              }
-            }) -%}
           {%- endfor -%}
-          {{ result_interfaces | tojson }}
+          {{ interfaces | tojson }}
