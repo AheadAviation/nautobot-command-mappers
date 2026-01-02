@@ -49,16 +49,16 @@ sync_devices:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() -%}
+            {%- if 'model:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   device_type:
     commands:
@@ -69,19 +69,19 @@ sync_devices:
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set manufacturer = 'Palo Alto Networks' -%}
-          {%- set model = '' -%}
+          {%- set ns = namespace(model='') -%}
           {%- for line in lines -%}
-            {%- if 'model:' in line.lower() -%}
+            {%- if 'model:' in line.lower() and not ns.model -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set model = parts[1].strip() -%}
+                {%- set ns.model = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if model -%}
-            {{ manufacturer }} {{ model }}
+          {%- if ns.model -%}
+            {{ manufacturer }} {{ ns.model }}
           {%- else -%}
-            {{ manufacturer }} PA-VM
+            {{ manufacturer }}
           {%- endif -%}
 
   platform:
@@ -99,16 +99,16 @@ sync_devices:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'sw-version:' in line.lower() -%}
+            {%- if 'sw-version:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   hostname:
     commands:
@@ -118,16 +118,16 @@ sync_devices:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'hostname:' in line.lower() -%}
+            {%- if 'hostname:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   serial:
     commands:
@@ -137,16 +137,16 @@ sync_devices:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'serial:' in line.lower() -%}
+            {%- if 'serial:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   mgmt_ip:
     commands:
@@ -156,24 +156,21 @@ sync_devices:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set result = '' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() -%}
+            {%- if 'ip-address:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {{ ip_part.split('/')[0].strip() }}
+                  {%- set ns.result = ip_part.split('/')[0].strip() -%}
                 {%- else -%}
-                  {{ ip_part }}
+                  {%- set ns.result = ip_part -%}
                 {%- endif -%}
-                {%- set result = ip_part -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {%- if not result -%}
-            {{ '' }}
-          {%- endif -%}
+          {{ ns.result }}
 
   mgmt_interface:
     commands:
@@ -191,19 +188,21 @@ sync_devices:
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
-          {%- set result = '24' -%}
+          {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
-            {%- if 'ip-address:' in line.lower() -%}
+            {%- if 'ip-address:' in line.lower() and not ns.result -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ip_part = parts[1].strip() -%}
                 {%- if '/' in ip_part -%}
-                  {%- set result = ip_part.split('/')[1].strip() -%}
+                  {%- set ns.result = ip_part.split('/')[1].strip() -%}
+                {%- else -%}
+                  {%- set ns.result = '24' -%}
                 {%- endif -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result if ns.result else '24' }}
 
 sync_network_data:
   serial:
@@ -588,8 +587,8 @@ sync_network_data:
           {%- endfor -%}
           {# Add management interface if found #}
           {%- if ns.mgmt_ip and ns.mgmt_mask -%}
-            {%- if 'management' not in ns.all_interfaces -%}
-              {%- set _ = ns.all_interfaces.append('management') -%}
+            {%- if 'mgmt' not in ns.all_interfaces -%}
+              {%- set _ = ns.all_interfaces.append('mgmt') -%}
             {%- endif -%}
             {%- set octets = ns.mgmt_mask.split('.') -%}
             {%- set prefix_bits = 0 -%}
@@ -642,7 +641,7 @@ sync_network_data:
               {%- elif val == 128 -%}{%- set prefix_bits = prefix_bits + 1 -%}
               {%- endif -%}
             {%- endif -%}
-            {%- set _ = ns.config_interfaces.update({'management': {'ip_addresses': [{'ip_address': ns.mgmt_ip, 'prefix_length': prefix_bits}], 'vlan_tag': none}}) -%}
+            {%- set _ = ns.config_interfaces.update({'mgmt': {'ip_addresses': [{'ip_address': ns.mgmt_ip, 'prefix_length': prefix_bits}], 'vlan_tag': none}}) -%}
           {%- endif -%}
           {# Build interfaces dictionary from config data #}
           {%- set interfaces = {} -%}
@@ -676,7 +675,7 @@ sync_network_data:
                 {%- set iface_type = 'virtual' -%}
               {%- elif 'tunnel' in name.lower() -%}
                 {%- set iface_type = 'virtual' -%}
-              {%- elif name == 'management' -%}
+              {%- elif name == 'mgmt' -%}
                 {%- set iface_type = '1000base-t' -%}
               {%- endif -%}
               {# Get IP addresses from config #}
@@ -723,7 +722,7 @@ sync_network_data:
                 '802.1Q_mode': dot1q_mode
               } -%}
               {# Add mgmt_only flag for management interface #}
-              {%- if name == 'management' -%}
+              {%- if name == 'mgmt' -%}
                 {%- set _ = iface_dict.update({'mgmt_only': true}) -%}
               {%- endif -%}
               {%- set _ = interfaces.update({name: iface_dict}) -%}
