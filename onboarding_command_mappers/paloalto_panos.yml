@@ -47,7 +47,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
@@ -66,7 +66,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set manufacturer = 'Palo Alto Networks' -%}
           {%- set model = '' -%}
@@ -97,7 +97,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
@@ -116,7 +116,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
@@ -135,7 +135,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
@@ -154,7 +154,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '' -%}
           {%- for line in lines -%}
@@ -188,7 +188,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = '24' -%}
           {%- for line in lines -%}
@@ -211,7 +211,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and ':' in line -%}
@@ -225,7 +225,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = 'unknown' -%}
           {%- for line in lines -%}
@@ -245,7 +245,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set cables = [] -%}
           {# Simple LLDP parser #}
@@ -273,7 +273,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vrfs = {} -%}
           {%- set ns = namespace(in_vr=false, level=0, vr_level=-1, current_vr=none) -%}
@@ -308,7 +308,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vlans = {} -%}
           {%- for line in lines -%}
@@ -334,7 +334,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(
               config_interfaces={},
@@ -516,7 +516,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
@@ -535,7 +535,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set manufacturer = 'Palo Alto Networks' -%}
           {%- set ns = namespace(model='') -%}
@@ -566,7 +566,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
@@ -585,7 +585,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
@@ -604,7 +604,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
@@ -623,7 +623,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
@@ -654,7 +654,7 @@ sync_devices:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='') -%}
           {%- for line in lines -%}
@@ -679,7 +679,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- for line in lines -%}
             {%- if 'serial:' in line.lower() and ':' in line -%}
@@ -693,7 +693,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set result = 'unknown' -%}
           {%- for line in lines -%}
@@ -713,7 +713,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set cables = [] -%}
           {# Simple LLDP parser #}
@@ -741,7 +741,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vrfs = {} -%}
           {%- set ns = namespace(in_vr=false, level=0, vr_level=-1, current_vr=none) -%}
@@ -776,7 +776,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set vlans = {} -%}
           {%- for line in lines -%}
@@ -802,7 +802,7 @@ sync_network_data:
         parser: "raw"
         jpath: "@"
         post_processor: |
-          {%- set raw_obj = obj.raw if obj is mapping else obj -%}
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(
               config_interfaces={},
