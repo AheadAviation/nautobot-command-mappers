@@ -461,35 +461,38 @@ sync_network_data:
 
           {%- set result_interfaces = {} -%}
           {%- for name, config in ns.config_interfaces.items() -%}
+            {%- set is_mgmt = (name == 'mgmt') -%}
             {%- set is_sub = '.' in name -%}
-            {%- set is_parent = not is_sub -%}
+            {%- set is_parent = not is_sub and not is_mgmt -%}
             {%- set vrf_name = ns.vrf_map.get(name) -%}
             {%- set iface_vrf = {"name": vrf_name} if vrf_name else none -%}
             {%- set dot1q_mode = '' -%}
             {%- set untagged_vlan = none -%}
             {%- set tagged_vlans = [] -%}
-            {%- if is_sub and config.get('vlan_tag') -%}
-              {%- set dot1q_mode = 'access' -%}
-              {%- set tag = config.get('vlan_tag') -%}
-              {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
-            {%- elif is_parent -%}
-              {%- for sub_name, sub_config in ns.config_interfaces.items() -%}
-                {%- if sub_name.startswith(name ~ '.') -%}
-                  {%- set stag = sub_config.get('vlan_tag') -%}
-                  {%- if stag -%}
-                    {%- set _ = tagged_vlans.append({"name": "VLAN" ~ stag, "id": stag | string}) -%}
+            {%- if not is_mgmt -%}
+              {%- if is_sub and config.get('vlan_tag') -%}
+                {%- set dot1q_mode = 'access' -%}
+                {%- set tag = config.get('vlan_tag') -%}
+                {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
+              {%- elif is_parent -%}
+                {%- for sub_name, sub_config in ns.config_interfaces.items() -%}
+                  {%- if sub_name.startswith(name ~ '.') -%}
+                    {%- set stag = sub_config.get('vlan_tag') -%}
+                    {%- if stag -%}
+                      {%- set _ = tagged_vlans.append({"name": "VLAN" ~ stag, "id": stag | string}) -%}
+                    {%- endif -%}
                   {%- endif -%}
-                {%- endif -%}
-              {%- endfor -%}
-            {%- endif -%}
-            {%- if tagged_vlans | length > 0 -%}
-              {%- set dot1q_mode = 'tagged' -%}
+                {%- endfor -%}
+              {%- endif -%}
+              {%- if tagged_vlans | length > 0 -%}
+                {%- set dot1q_mode = 'tagged' -%}
+              {%- endif -%}
             {%- endif -%}
 
             {%- set _ = result_interfaces.update({
               name: {
                 "type": config.get('type', '1000base-t'),
-                "mac_address": "",
+                "mac_address": none,
                 "mtu": "1500",
                 "description": config.get('description', ''),
                 "link_status": true,
@@ -498,7 +501,8 @@ sync_network_data:
                 "untagged_vlan": untagged_vlan,
                 "lag": "",
                 "vrf": iface_vrf,
-                "802.1Q_mode": dot1q_mode
+                "802.1Q_mode": dot1q_mode,
+                "mgmt_only": is_mgmt
               }
             }) -%}
           {%- endfor -%}
