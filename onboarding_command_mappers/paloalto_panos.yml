@@ -187,6 +187,7 @@ sync_devices:
       - command: "show system info"
         parser: "raw"
         jpath: "@"
+        iterable_type: "int"
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
@@ -653,6 +654,7 @@ sync_devices:
       - command: "show system info"
         parser: "raw"
         jpath: "@"
+        iterable_type: "int"
         post_processor: |
           {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
           {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
