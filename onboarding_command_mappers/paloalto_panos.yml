@@ -271,10 +271,9 @@ sync_network_data:
     commands:
       - command: "show config running"
         parser: "raw"
-        jpath: "@"
+        jpath: "raw"
         post_processor: |
-          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set vrfs = {} -%}
           {%- set ns = namespace(in_vr=false, level=0, vr_level=-1, current_vr=none) -%}
           {%- for line in lines -%}
@@ -306,10 +305,9 @@ sync_network_data:
     commands:
       - command: "show config running"
         parser: "raw"
-        jpath: "@"
+        jpath: "raw"
         post_processor: |
-          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
-          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set vlans = {} -%}
           {%- for line in lines -%}
             {%- set stripped = line.strip() -%}
