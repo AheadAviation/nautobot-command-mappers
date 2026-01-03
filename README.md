@@ -335,5 +335,6 @@ For issues or questions:
 
 ---
 
-**Last Updated:** January 2, 2026
+**Last Updated:** January 2, 2026  
+**Current Version:** v2.4 - Fixed jpath configuration for VRFs, VLANs, and all sync_network_data sections
 
