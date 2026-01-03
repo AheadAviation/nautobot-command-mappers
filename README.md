@@ -16,7 +16,7 @@ This repository contains YAML override files for the Nautobot Device Onboarding 
 ### Palo Alto PAN-OS (`paloalto_panos.yml`)
 
 **Status:** ✅ Production Ready  
-**Version:** v2.2  
+**Version:** v2.4  
 **Tested:** PAN-OS 8.0+ (tested on PAN-OS 10.x)
 
 #### Requirements
@@ -27,27 +27,26 @@ This override requires specific Nautobot configuration for proper operation. Add
 
 ```python
 PLUGINS_CONFIG = {
-    "nautobot_device_onboarding": {
-        "netmiko_optional_args": {
-            "read_timeout": 60,  # Increase from default 20s for slow devices
-            "timeout": 90,
-            "banner_timeout": 60,
-            "global_delay_factor": 3,
-            "fast_cli": False,
-        },
-    },
+    # Note: nautobot_device_onboarding uses nautobot_plugin_nornir connection options
+    # Configure Netmiko options in nautobot_plugin_nornir, not in nautobot_device_onboarding
     "nautobot_plugin_nornir": {
         "connection_options": {
             "netmiko": {
                 "extras": {
-                    "read_timeout": 60,
-                    "read_timeout_override": 60,
+                    # Netmiko connection options for slow devices (like Palo Alto)
+                    "read_timeout": 60,  # Increase from default 20s for slow devices
+                    "timeout": 90,  # Connection timeout
+                    "banner_timeout": 60,  # Banner timeout
+                    "global_delay_factor": 3,  # Slow down command execution
+                    "fast_cli": False,  # Disable fast CLI mode for better compatibility
                 }
             }
         }
     }
 }
 ```
+
+**Important:** Do not use `read_timeout_override` - it is not a valid Netmiko parameter and will cause connection errors.
 
 After updating the configuration, restart Nautobot services:
 ```bash
@@ -124,6 +123,11 @@ Due to a limitation in the `nautobot-device-onboarding` plugin where it does not
 - Maintains state using Jinja2 `namespace()` for complex multi-pass parsing
 - Handles parent/sub-interface relationships by analyzing interface names
 - Maps VRFs to interfaces by tracking virtual-router sections
+
+**Important: jpath Configuration:**
+- When using `parser: "raw"`, always use `jpath: "raw"` (not `jpath: "@"`)
+- The `"raw"` jpath correctly returns the raw string output for post-processing
+- Using `jpath: "@"` with raw parser output may cause parsing failures
 
 **Documentation:**
 - See `SCHEMA_REFERENCE.md` for detailed schema documentation
@@ -214,7 +218,7 @@ sync_network_data:
 - **`sync_network_data`** - Detailed network data (interfaces, IPs, VLANs, VRFs)
 - **`commands`** - List of CLI commands to execute
 - **`parser`** - Parser type (`textfsm`, `pyats`, `ttp`, `raw`, `none`)
-- **`jpath`** - JMESPath expression to extract data (use `raw` with `parser: raw`)
+- **`jpath`** - JMESPath expression to extract data (use `"raw"` with `parser: raw` to get the raw string output)
 - **`post_processor`** - Jinja2 template to transform extracted data
 
 ## Important Notes
@@ -278,6 +282,20 @@ This will:
 
 ### Palo Alto PAN-OS (paloalto_panos.yml)
 
+- **v2.4** (2026-01-02) - jpath and VRF/VLAN Fixes
+  - ✅ Fixed `jpath` from `"@"` to `"raw"` for VRFs, VLANs, cables, serial, and software_version sections
+  - ✅ Ensured consistent `jpath: "raw"` usage across all `sync_network_data` sections
+  - ✅ Fixed VRF and VLAN extraction by correcting jpath configuration
+  - ✅ All sections now consistently use `jpath: "raw"` with `parser: "raw"` for proper data extraction
+
+- **v2.3** (2026-01-02) - Configuration and sync_devices Fixes
+  - ✅ Fixed `sync_devices` post-processors to use `namespace()` for consistent value returns
+  - ✅ Changed management interface name to `"mgmt"` for compatibility
+  - ✅ Updated configuration to use only `nautobot_plugin_nornir` connection options
+  - ✅ Removed invalid `read_timeout_override` parameter
+  - ✅ Enhanced Jinja2 templates to handle both string and dict-wrapped outputs
+  - ✅ Production tested and validated on fresh Nautobot installations
+
 - **v2.2** (2026-01-01) - Advanced Network Data Sync
   - ✅ Added comprehensive `sync_network_data` section
   - ✅ Software version extraction and synchronization
@@ -317,5 +335,5 @@ For issues or questions:
 
 ---
 
-**Last Updated:** January 1, 2026
+**Last Updated:** January 2, 2026
 
