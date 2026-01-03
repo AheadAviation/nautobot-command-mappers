@@ -227,7 +227,7 @@ sync_network_data:
           {%- set lines = obj.replace('\r', '').split('\n') -%}
           {%- set ns = namespace(result='unknown') -%}
           {%- for line in lines -%}
-            {%- if 'sw-version:' in line.lower() and not ns.result or ns.result == 'unknown' -%}
+            {%- if 'sw-version:' in line.lower() and ns.result == 'unknown' -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
                 {%- set ns.result = parts[1].strip() -%}
