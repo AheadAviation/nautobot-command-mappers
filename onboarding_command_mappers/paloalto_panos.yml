@@ -225,17 +225,16 @@ sync_network_data:
         jpath: "raw"
         post_processor: |
           {%- set lines = obj.replace('\r', '').split('\n') -%}
-          {%- set result = 'unknown' -%}
+          {%- set ns = namespace(result='unknown') -%}
           {%- for line in lines -%}
-            {%- set lower_line = line.lower() -%}
-            {%- if 'sw-version' in lower_line -%}
+            {%- if 'sw-version:' in line.lower() and not ns.result or ns.result == 'unknown' -%}
               {%- set parts = line.split(':', 1) -%}
               {%- if parts | length > 1 -%}
-                {%- set result = parts[1].strip() -%}
+                {%- set ns.result = parts[1].strip() -%}
               {%- endif -%}
             {%- endif -%}
           {%- endfor -%}
-          {{ result }}
+          {{ ns.result }}
 
   cables:
     commands:
