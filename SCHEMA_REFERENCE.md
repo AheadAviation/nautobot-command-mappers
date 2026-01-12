@@ -1,7 +1,8 @@
 # Nautobot Device Onboarding YAML Schema (Golden Reference - Updated)
 
-**Status:** Verified Working (Dec 30, 2025)  
-**Platform Context:** Palo Alto PAN-OS (applies generally to v4.0+ SSoT)
+**Status:** Verified Working (Jan 2, 2026)  
+**Platform Context:** Palo Alto PAN-OS (applies generally to v4.0+ SSoT)  
+**Based on:** Production-tested `paloalto_panos.yml` v2.4
 
 This reference documents the schema used in a successful override. Unlike previous versions, this confirms that **`sync_network_data`** can process multiple CLI commands independently as sibling keys.
 
@@ -50,21 +51,27 @@ These keys populate the basic **Device** model. The post_processor must return a
 
 **Jinja Pattern (String Extraction):**
 
+The plugin may pass `obj` as either a string or a dictionary. Use this pattern to handle both cases:
+
 ```jinja
-{%- set lines = obj.replace('\r', '').split('\n') -%}
-{%- set result = '' -%}
+{%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
+{%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+{%- set ns = namespace(result='') -%}
 {%- for line in lines -%}
-  {%- if 'target:' in line.lower() -%}
+  {%- if 'target:' in line.lower() and not ns.result -%}
     {%- set parts = line.split(':', 1) -%}
     {%- if parts | length > 1 -%}
-      {%- set result = parts[1].strip() -%}
+      {%- set ns.result = parts[1].strip() -%}
     {%- endif -%}
   {%- endif -%}
 {%- endfor -%}
-{{ result }}
+{{ ns.result }}
 ```
 
-**Important:** Always return a string (even an empty one) to prevent `NoneType` errors in subsequent processing.
+**Important:** 
+- Always return a string (even an empty one) to prevent `NoneType` errors in subsequent processing
+- Use `namespace()` to maintain state across loops when needed
+- Handle both string and dict-wrapped outputs using the `obj.get('raw', obj) if obj is mapping else obj` pattern
 
 ## 2. `sync_network_data` (SSoT/Detail Sync)
 
@@ -91,6 +98,8 @@ serial:
           {%- endif -%}
         {%- endfor -%}
 ```
+
+**Note:** For `sync_network_data`, use `jpath: "raw"` with `parser: "raw"` to get the raw string output directly.
 
 ### B. Key: `interfaces`
 
@@ -158,9 +167,207 @@ serial:
 {{ interfaces | tojson }}
 ```
 
+### C. Key: `vrfs`
+
+**Purpose:** Provides Virtual Router (VRF) data for synchronization.
+
+**Output Structure:** A **JSON Dictionary** where keys are VRF names.
+
+**Valid Schema:**
+```json
+{
+  "default": {
+    "name": "default",
+    "description": "Imported from Palo Alto"
+  },
+  "vr-customer1": {
+    "name": "vr-customer1",
+    "description": "Imported from Palo Alto"
+  }
+}
+```
+
+**Example:**
+```yaml
+vrfs:
+  commands:
+    - command: "show config running"
+      parser: "raw"
+      jpath: "raw"
+      post_processor: |
+        {%- set lines = obj.replace('\r', '').split('\n') -%}
+        {%- set vrfs = {} -%}
+        {# Parse virtual-router blocks from config #}
+        ...
+        {{ vrfs | tojson }}
+```
+
+### D. Key: `vlans`
+
+**Purpose:** Provides VLAN data for synchronization.
+
+**Output Structure:** A **JSON Dictionary** where keys are VLAN IDs (as strings).
+
+**Valid Schema:**
+```json
+{
+  "10": {
+    "vid": 10,
+    "name": "VLAN10",
+    "status": "active"
+  },
+  "20": {
+    "vid": 20,
+    "name": "VLAN20",
+    "status": "active"
+  }
+}
+```
+
+**Example:**
+```yaml
+vlans:
+  commands:
+    - command: "show config running"
+      parser: "raw"
+      jpath: "raw"
+      post_processor: |
+        {%- set lines = obj.replace('\r', '').split('\n') -%}
+        {%- set vlans = {} -%}
+        {# Parse VLAN tags from interface configs #}
+        ...
+        {{ vlans | tojson }}
+```
+
+### E. Key: `cables`
+
+**Purpose:** Provides cable/LLDP neighbor data for synchronization.
+
+**Output Structure:** A **JSON Array** of cable objects.
+
+**Valid Schema:**
+```json
+[
+  {
+    "local_interface": "ethernet1/1",
+    "remote_interface": "GigabitEthernet0/1",
+    "remote_device": "switch01.example.com"
+  },
+  {
+    "local_interface": "ethernet1/2",
+    "remote_interface": "GigabitEthernet0/2",
+    "remote_device": "switch02.example.com"
+  }
+]
+```
+
+**Example:**
+```yaml
+cables:
+  commands:
+    - command: "show lldp neighbors all"
+      parser: "raw"
+      jpath: "raw"
+      post_processor: |
+        {%- set lines = obj.replace('\r', '').split('\n') -%}
+        {%- set cables = [] -%}
+        {# Parse LLDP neighbor information #}
+        ...
+        {{ cables | tojson }}
+```
+
+### F. Key: `software_version`
+
+**Purpose:** Provides software version information for synchronization.
+
+**Output:** A **String** containing the software version (e.g., "10.2.3" or "10.1.6-h6").
+
+**Example:**
+```yaml
+software_version:
+  commands:
+    - command: "show system info"
+      parser: "raw"
+      jpath: "raw"
+      post_processor: |
+        {%- set lines = obj.replace('\r', '').split('\n') -%}
+        {%- set ns = namespace(result='unknown') -%}
+        {%- for line in lines -%}
+          {%- if 'sw-version:' in line.lower() and ns.result == 'unknown' -%}
+            {%- set parts = line.split(':', 1) -%}
+            {%- if parts | length > 1 -%}
+              {%- set ns.result = parts[1].strip() -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {{ ns.result }}
+```
+
+**Note:** All `sync_network_data` keys are processed independently. You can include any combination of these keys based on your platform's capabilities and requirements.
+
+## jpath Configuration Guide
+
+**Critical:** The `jpath` field behaves differently depending on the section:
+
+### For `sync_devices` (Device Creation)
+- **`jpath: "@"`** works with `parser: "raw"` - the plugin may wrap the output in a dict or pass it as a string
+- **Pattern:** Always handle both cases using `{%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}`
+- This allows your post-processor to work whether `obj` is a string or `{"raw": "..."}`
+
+### For `sync_network_data` (SSoT Sync)
+- **`jpath: "raw"`** is required with `parser: "raw"` - this ensures you get the raw string output
+- **Pattern:** Use `jpath: "raw"` to directly access the raw command output as a string
+- The plugin passes the raw string directly to the post-processor
+
+**Example Comparison:**
+
+```yaml
+# sync_devices - can use "@" and handle both formats
+sync_devices:
+  hostname:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "@"  # Works - handles both string and dict
+        post_processor: |
+          {%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
+          {%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+          ...
+
+# sync_network_data - should use "raw"
+sync_network_data:
+  serial:
+    commands:
+      - command: "show system info"
+        parser: "raw"
+        jpath: "raw"  # Required - gets raw string directly
+        post_processor: |
+          {%- set lines = obj.replace('\r', '').split('\n') -%}
+          ...
+```
+
 ## Validated Jinja Patterns (From Working Code)
 
-### 1. MAC Address Normalization
+### 1. Handling Both String and Dict Outputs (sync_devices)
+
+When using `jpath: "@"` with `parser: "raw"` in `sync_devices`, the plugin may pass `obj` as either a string or a dictionary. Use this pattern:
+
+```jinja
+{%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}
+{%- set lines = raw_obj.replace('\r', '').split('\n') -%}
+{%- set ns = namespace(result='') -%}
+{%- for line in lines -%}
+  {%- if 'target:' in line.lower() and not ns.result -%}
+    {%- set parts = line.split(':', 1) -%}
+    {%- if parts | length > 1 -%}
+      {%- set ns.result = parts[1].strip() -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+{{ ns.result }}
+```
+
+### 2. MAC Address Normalization
 
 Handles dots (`.`) removal, colon insertion, and validation of invalid strings:
 
@@ -190,7 +397,7 @@ Handles dots (`.`) removal, colon insertion, and validation of invalid strings:
 {%- endif -%}
 ```
 
-### 2. Interface Type Mapping
+### 3. Interface Type Mapping
 
 Determine type based on naming convention:
 
@@ -202,7 +409,7 @@ Determine type based on naming convention:
     else 'other'))) -%}
 ```
 
-### 3. Namespace Management
+### 4. Namespace Management
 
 Using `namespace()` is required to maintain state across loops in Jinja:
 
@@ -218,7 +425,7 @@ Using `namespace()` is required to maintain state across loops in Jinja:
 ) -%}
 ```
 
-### 4. Conditional 802.1Q_mode Setting
+### 5. Conditional 802.1Q_mode Setting
 
 For L3 interfaces, omit or use empty string; for L2-capable interfaces, set appropriately:
 
@@ -234,7 +441,7 @@ For L3 interfaces, omit or use empty string; for L2-capable interfaces, set appr
 {%- endif -%}
 ```
 
-### 5. Adding Management Interface
+### 6. Adding Management Interface
 
 Include the management interface directly in the interfaces dictionary:
 
@@ -286,6 +493,10 @@ Include the management interface directly in the interfaces dictionary:
 ## Checklist for New Overrides
 
 - [ ] **Separate Serial:** Ensure `serial` is defined in *both* `sync_devices` and `sync_network_data`
+- [ ] **jpath Configuration:**
+  - `sync_devices`: Use `jpath: "@"` with `parser: "raw"` and handle both string/dict outputs
+  - `sync_network_data`: Use `jpath: "raw"` with `parser: "raw"` for direct string access
+- [ ] **Handle Both Output Formats:** In `sync_devices`, use `{%- set raw_obj = obj.get('raw', obj) if obj is mapping else obj -%}` pattern
 - [ ] **Structure:** `interfaces` post-processor outputs `{{ interfaces | tojson }}` (a dictionary, not a list)
 - [ ] **Interface Names:** Dictionary keys are interface names; do NOT include `name` field in interface dicts
 - [ ] **Booleans:** Use `true`/`false` (JSON) for `link_status` and `mgmt_only`
@@ -296,11 +507,16 @@ Include the management interface directly in the interfaces dictionary:
 - [ ] **Management Interface:** Include directly in `interfaces` dict with `mgmt_only: true`
 - [ ] **MAC Normalization:** Convert dot notation (e.g., "AAAA.BBBB.CCCC") to colon format (e.g., "aa:bb:cc:dd:ee:ff")
 - [ ] **Always Return Strings:** All `sync_devices` post-processors must return strings (even empty ones)
+- [ ] **Use namespace():** For complex parsing in `sync_devices`, use `namespace()` to maintain state across loops
 
 ## Best Practices
 
+- **jpath Selection:**
+  - For `sync_devices`: Use `jpath: "@"` with `parser: "raw"` and handle both string/dict outputs
+  - For `sync_network_data`: Use `jpath: "raw"` with `parser: "raw"` for direct string access
 - **Use Single Command Per Key:** Each key (`serial`, `interfaces`, etc.) should use a single command that returns all needed data. The plugin does not properly merge multiple command outputs when using different `jpath` values.
 - **Parse Everything in Jinja2:** Since you're limited to one command per key, use Jinja2 post-processing to extract all needed information from that single command output.
+- **Handle Output Variations:** In `sync_devices`, always check if `obj` is a mapping (dict) or string and handle both cases
 - **Include all interfaces** (with or without IP addresses)
 - **Filter meaningless interfaces:** Skip virtual/system interfaces like "vlan", "tunnel", "loopback", "name" if they appear as headers
 - **Use namespace for state:** Maintain parsing state (flags, dictionaries, lists) across loops using `namespace()` for complex parsing tasks

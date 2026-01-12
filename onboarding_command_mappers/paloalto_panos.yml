@@ -265,7 +265,7 @@ sync_network_data:
 
   vrfs:
     commands:
-      - command: "show config running"
+      - command: "show config merged"
         parser: "raw"
         jpath: "raw"
         post_processor: |
@@ -299,7 +299,7 @@ sync_network_data:
 
   vlans:
     commands:
-      - command: "show config running"
+      - command: "show config merged"
         parser: "raw"
         jpath: "raw"
         post_processor: |
@@ -324,7 +324,7 @@ sync_network_data:
 
   interfaces:
     commands:
-      - command: "show config running"
+      - command: "show config merged"
         parser: "raw"
         jpath: "raw"
         post_processor: |
