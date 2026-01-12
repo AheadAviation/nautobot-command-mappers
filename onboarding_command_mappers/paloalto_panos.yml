@@ -282,7 +282,7 @@ sync_network_data:
               {%- elif ns.in_vr and ns.level == ns.vr_level + 1 -%}
                 {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
                 {%- if ns.current_vr not in vrfs -%}
-                  {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "description": "Imported from Palo Alto"}}) -%}
+                  {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "namespace": "Global", "description": "Imported from Palo Alto"}}) -%}
                 {%- endif -%}
               {%- endif -%}
             {%- elif stripped.endswith('}') -%}
@@ -314,7 +314,8 @@ sync_network_data:
                 {%- if tag > 0 and tag < 4095 -%}
                   {%- set tag_str = tag | string -%}
                   {%- if tag_str not in vlans -%}
-                    {%- set _ = vlans.update({tag_str: {"vid": tag, "name": "VLAN" ~ tag_str, "status": "active"}}) -%}
+                    {# Explicitly set locations to empty list to prevent automatic location assignment #}
+                    {%- set _ = vlans.update({tag_str: {"vid": tag, "name": "VLAN" ~ tag_str, "status": "Active", "locations": []}}) -%}
                   {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
@@ -357,7 +358,10 @@ sync_network_data:
               current_subiface=none,
               expect_ip_value=false,
               mgmt_ip=none,
-              mgmt_mask=none
+              mgmt_mask=none,
+              untagged_subinterface_enabled=false,
+              mtu_map={},
+              jumbo_frame_enabled=false
           ) -%}
           {# Parse hierarchical config format using brace-level tracking #}
           {%- for line in lines -%}
@@ -556,6 +560,23 @@ sync_network_data:
                   {%- if vlan_tag > 0 and ns.current_subiface in ns.config_interfaces -%}
                     {%- set _ = ns.config_interfaces[ns.current_subiface].update({'vlan_tag': vlan_tag}) -%}
                   {%- endif -%}
+                {%- elif parts | length >= 2 and parts[0] == 'untagged-sub-interface' and parts[1] == 'yes' and ns.in_layer3 and ns.current_iface -%}
+                  {# Untagged subinterface mode enabled: untagged-sub-interface yes; #}
+                  {%- if ns.current_iface not in ns.config_interfaces -%}
+                    {%- set _ = ns.config_interfaces.update({ns.current_iface: {'ip_addresses': [], 'vlan_tag': none, 'untagged_subinterface': true}}) -%}
+                  {%- else -%}
+                    {%- set _ = ns.config_interfaces[ns.current_iface].update({'untagged_subinterface': true}) -%}
+                  {%- endif -%}
+                {%- elif parts | length >= 2 and parts[0] == 'mtu' and (ns.current_iface or ns.current_subiface) -%}
+                  {# MTU value: mtu 9216; #}
+                  {%- set mtu_value = parts[1] | int(default=1500) -%}
+                  {%- set target = ns.current_subiface if ns.current_subiface else ns.current_iface -%}
+                  {%- if target -%}
+                    {%- set _ = ns.mtu_map.update({target: mtu_value}) -%}
+                  {%- endif -%}
+                {%- elif parts | length >= 2 and parts[0] == 'jumbo-frame' and parts[1] == 'yes' -%}
+                  {# Global jumbo frame setting: jumbo-frame yes; #}
+                  {%- set ns.jumbo_frame_enabled = true -%}
                 {%- elif ns.in_system and parts | length >= 2 and parts[0] == 'ip-address' -%}
                   {# Management IP: ip-address 192.168.11.16; #}
                   {%- set ns.mgmt_ip = parts[1] -%}
@@ -674,19 +695,57 @@ sync_network_data:
               {%- endif -%}
               {# Get IP addresses from config #}
               {%- set ip_addresses = config.get('ip_addresses', []) -%}
+              {# Determine LAG parent for subinterfaces #}
+              {%- set lag_parent = '' -%}
+              {%- if is_sub -%}
+                {%- set parent_name = name.split('.')[0] -%}
+                {%- if parent_name.startswith('ae') -%}
+                  {%- set lag_parent = parent_name -%}
+                {%- endif -%}
+              {%- endif -%}
+              {# Get MTU from config or use defaults #}
+              {%- set iface_mtu = ns.mtu_map.get(name, none) -%}
+              {%- if not iface_mtu -%}
+                {# Default to 9216 if jumbo frames enabled globally, else 1500 #}
+                {%- set iface_mtu = '9216' if ns.jumbo_frame_enabled else '1500' -%}
+              {%- else -%}
+                {%- set iface_mtu = iface_mtu | string -%}
+              {%- endif -%}
               {# Get VRF from vrf_map if available #}
-              {# NOTE: VRF assignment disabled - plugin expects null, not string names #}
-              {# VRFs must be manually assigned in Nautobot after onboarding #}
-              {%- set iface_vrf = none -%}
-              {# Determine 802.1Q mode #}
+              {# VRF must be a dictionary with 'name' and 'namespace' keys #}
+              {%- set vrf_name = ns.vrf_map.get(name, none) -%}
+              {# If not found, check parent interface for VRF (for subinterfaces) #}
+              {%- if not vrf_name and is_sub -%}
+                {%- set parent_name = name.split('.')[0] -%}
+                {%- set vrf_name = ns.vrf_map.get(parent_name, none) -%}
+              {%- endif -%}
+              {# Convert VRF name to dictionary format expected by plugin #}
+              {%- set iface_vrf = {"name": vrf_name, "namespace": "Global"} if vrf_name else none -%}
+              {# Determine 802.1Q mode and VLAN assignments #}
               {%- set dot1q_mode = '' -%}
               {%- set untagged_vlan = none -%}
               {%- set tagged_vlans = [] -%}
-              {%- if is_sub and config.get('vlan_tag') -%}
-                {# Subinterface with VLAN tag - access mode #}
-                {%- set dot1q_mode = 'access' -%}
-                {%- set tag = config.get('vlan_tag') -%}
-                {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
+              {%- if is_sub -%}
+                {# Subinterface logic #}
+                {%- set parent_name = name.split('.')[0] -%}
+                {%- set parent_config = ns.config_interfaces.get(parent_name, {}) -%}
+                {%- if parent_config.get('untagged_subinterface', false) -%}
+                  {# Untagged subinterface mode enabled on parent - subinterface handles untagged traffic #}
+                  {%- set dot1q_mode = 'access' -%}
+                  {# If subinterface has a tag, use it as the untagged VLAN #}
+                  {%- if config.get('vlan_tag') -%}
+                    {%- set tag = config.get('vlan_tag') -%}
+                    {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
+                  {%- endif -%}
+                {%- elif config.get('vlan_tag') -%}
+                  {# Tagged subinterface - access mode with VLAN tag #}
+                  {%- set dot1q_mode = 'access' -%}
+                  {%- set tag = config.get('vlan_tag') -%}
+                  {%- set untagged_vlan = {"name": "VLAN" ~ tag, "id": tag | string} -%}
+                {%- else -%}
+                  {# Subinterface without tag - access mode #}
+                  {%- set dot1q_mode = 'access' -%}
+                {%- endif -%}
               {%- elif is_parent -%}
                 {# Physical interface with subinterfaces - tagged/trunk mode #}
                 {%- set dot1q_mode = 'tagged' -%}
@@ -705,13 +764,13 @@ sync_network_data:
               {%- set iface_dict = {
                 'type': iface_type,
                 'mac_address': none,
-                'mtu': '1500',
+                'mtu': iface_mtu,
                 'description': '',
                 'link_status': true,
                 'ip_addresses': ip_addresses,
                 'tagged_vlans': tagged_vlans,
                 'untagged_vlan': untagged_vlan,
-                'lag': '',
+                'lag': lag_parent,
                 'vrf': iface_vrf,
                 '802.1Q_mode': dot1q_mode
               } -%}
