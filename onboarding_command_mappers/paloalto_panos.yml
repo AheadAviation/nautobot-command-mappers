@@ -296,8 +296,11 @@ sync_network_data:
                 {%- set ns.vr_level = ns.level -%}
               {%- elif ns.in_vr and ns.level == ns.vr_level + 1 -%}
                 {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
-                {# Only create VRF if it's a valid name (not just a number or empty) #}
-                {%- if ns.current_vr and ns.current_vr not in vrfs and not (ns.current_vr | int(default=-1) >= 0) -%}
+                {# Only create VRF if it's a valid name (not just a number, not empty) #}
+                {# Check if it's a pure number by trying to convert and checking if result equals original #}
+                {%- set num_test = ns.current_vr | int(default=-999) -%}
+                {%- set is_pure_number = (num_test >= 0 and num_test | string == ns.current_vr) -%}
+                {%- if ns.current_vr and ns.current_vr not in vrfs and not is_pure_number -%}
                   {# Namespace will be assigned by plugin based on job parameters #}
                   {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "description": "Imported from Palo Alto"}}) -%}
                 {%- endif -%}
