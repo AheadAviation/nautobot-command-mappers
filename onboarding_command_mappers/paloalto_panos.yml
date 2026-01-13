@@ -41,6 +41,10 @@
 # - default_prefix_status: Prefix/VLAN status name (e.g., "Active") from job form dropdown
 # - ip_address_status: IP address status name (e.g., "Active") from job form dropdown
 #
+# NOTE: If variables are not available, check the plugin source code:
+# https://github.com/nautobot/nautobot-app-device-onboarding/blob/v4.4.1/nautobot_device_onboarding/nornir_plays/transform.py
+# Look for how post_processor templates are rendered and what context is provided.
+#
 # Hardcoded Values (Platform-Specific)
 # =====================================
 # - manufacturer: 'Palo Alto Networks' (platform-specific, should remain hardcoded)
@@ -294,8 +298,9 @@ sync_network_data:
               {%- elif ns.in_vr and ns.level == ns.vr_level + 1 -%}
                 {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
                 {%- if ns.current_vr not in vrfs -%}
-                  {# Use namespace from job parameters #}
-                  {%- set vrf_namespace = namespace | default(none) -%}
+                  {# Try multiple variable name patterns for namespace from job parameters #}
+                  {# Common patterns: namespace, namespace_name, job_namespace, job_data.namespace #}
+                  {%- set vrf_namespace = namespace | default(namespace_name | default(job_namespace | default(job_data.namespace if job_data else none | default(none)))) -%}
                   {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "namespace": vrf_namespace, "description": "Imported from Palo Alto"}}) -%}
                 {%- endif -%}
               {%- endif -%}
@@ -328,9 +333,10 @@ sync_network_data:
                 {%- if tag > 0 and tag < 4095 -%}
                   {%- set tag_str = tag | string -%}
                   {%- if tag_str not in vlans -%}
-                    {# Use default_prefix_status from job parameters for VLAN status #}
+                    {# Try multiple variable name patterns for status from job parameters #}
+                    {# Common patterns: default_prefix_status, default_prefix_status_name, job_default_prefix_status, job_data.default_prefix_status #}
                     {# Explicitly set locations to empty list to prevent automatic location assignment #}
-                    {%- set vlan_status = default_prefix_status | default(none) -%}
+                    {%- set vlan_status = default_prefix_status | default(default_prefix_status_name | default(job_default_prefix_status | default(job_data.default_prefix_status if job_data else none | default(none)))) -%}
                     {%- set _ = vlans.update({tag_str: {"vid": tag, "name": "VLAN" ~ tag_str, "status": vlan_status, "locations": []}}) -%}
                   {%- endif -%}
                 {%- endif -%}
@@ -736,8 +742,8 @@ sync_network_data:
                 {%- set vrf_name = ns.vrf_map.get(parent_name, none) -%}
               {%- endif -%}
               {# Convert VRF name to dictionary format expected by plugin #}
-              {# Use namespace from job parameters #}
-              {%- set vrf_namespace = namespace | default(none) -%}
+              {# Try multiple variable name patterns for namespace from job parameters #}
+              {%- set vrf_namespace = namespace | default(namespace_name | default(job_namespace | default(job_data.namespace if job_data else none | default(none)))) -%}
               {%- set iface_vrf = {"name": vrf_name, "namespace": vrf_namespace} if vrf_name else none -%}
               {# Determine 802.1Q mode and VLAN assignments #}
               {%- set dot1q_mode = '' -%}
