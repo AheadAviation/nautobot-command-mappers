@@ -32,6 +32,18 @@
 # }
 #
 # After updating config, restart: docker-compose restart nautobot celery_worker
+#
+# Job Parameter Variables
+# =======================
+# The following variables should be provided by the job parameters:
+# - namespace_name: Namespace name (e.g., "Global") for VRFs and other namespace-dependent objects
+# - namespace: Alternative namespace variable (UUID or name) - used as fallback
+# - vlan_status_name: Status name for VLANs (e.g., "Active")
+# - default_prefix_status_name: Default status name - used as fallback for VLAN status
+#
+# Hardcoded Values (Platform-Specific)
+# =====================================
+# - manufacturer: 'Palo Alto Networks' (platform-specific, should remain hardcoded)
 
 sync_devices:
   manufacturer:
@@ -282,7 +294,9 @@ sync_network_data:
               {%- elif ns.in_vr and ns.level == ns.vr_level + 1 -%}
                 {%- set ns.current_vr = stripped.split('{')[0].strip() -%}
                 {%- if ns.current_vr not in vrfs -%}
-                  {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "namespace": "Global", "description": "Imported from Palo Alto"}}) -%}
+                  {# Use namespace from job parameters, fallback to None if not provided #}
+                  {%- set vrf_namespace = namespace_name | default(namespace | default(none)) -%}
+                  {%- set _ = vrfs.update({ns.current_vr: {"name": ns.current_vr, "namespace": vrf_namespace, "description": "Imported from Palo Alto"}}) -%}
                 {%- endif -%}
               {%- endif -%}
             {%- elif stripped.endswith('}') -%}
@@ -314,8 +328,10 @@ sync_network_data:
                 {%- if tag > 0 and tag < 4095 -%}
                   {%- set tag_str = tag | string -%}
                   {%- if tag_str not in vlans -%}
+                    {# Use status from job parameters, fallback to None if not provided #}
                     {# Explicitly set locations to empty list to prevent automatic location assignment #}
-                    {%- set _ = vlans.update({tag_str: {"vid": tag, "name": "VLAN" ~ tag_str, "status": "Active", "locations": []}}) -%}
+                    {%- set vlan_status = vlan_status_name | default(default_prefix_status_name | default(none)) -%}
+                    {%- set _ = vlans.update({tag_str: {"vid": tag, "name": "VLAN" ~ tag_str, "status": vlan_status, "locations": []}}) -%}
                   {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
@@ -720,7 +736,9 @@ sync_network_data:
                 {%- set vrf_name = ns.vrf_map.get(parent_name, none) -%}
               {%- endif -%}
               {# Convert VRF name to dictionary format expected by plugin #}
-              {%- set iface_vrf = {"name": vrf_name, "namespace": "Global"} if vrf_name else none -%}
+              {# Use namespace from job parameters, fallback to None if not provided #}
+              {%- set vrf_namespace = namespace_name | default(namespace | default(none)) -%}
+              {%- set iface_vrf = {"name": vrf_name, "namespace": vrf_namespace} if vrf_name else none -%}
               {# Determine 802.1Q mode and VLAN assignments #}
               {%- set dot1q_mode = '' -%}
               {%- set untagged_vlan = none -%}
